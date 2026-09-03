@@ -542,6 +542,10 @@ model Problem {
 
   reviewNote     String?
 
+  tags           String[]          @default([])
+
+  seedKey        String?           @unique
+
   createdAt      DateTime          @default(now())
 
   updatedAt      DateTime          @updatedAt
@@ -563,6 +567,8 @@ model Problem {
   @@index([authorId])
 
   @@index([visibility])
+
+  @@index([tags], type: Gin)
 
 }
 
@@ -740,6 +746,8 @@ model Match {
 
   playerBEloAfter  Int?
 
+  endedReason      String?
+
   createdAt        DateTime          @default(now())
 
   updatedAt        DateTime          @updatedAt
@@ -777,6 +785,8 @@ model MatchSubmission {
   problemId               String
 
   language                String
+
+  sourceCode              String            @db.Text @default("")
 
   verdict                 SubmissionVerdict
 

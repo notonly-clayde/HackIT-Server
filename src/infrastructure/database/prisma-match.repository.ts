@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client"
 import type {
   CreateMatchData,
   CreateMatchSubmissionData,
+  MatchHistoryRecord,
   MatchStatus,
   MatchSubmissionRecord,
   MatchWithPlayers,
@@ -65,6 +66,8 @@ function toProblem(record: MatchRecord["problem"]): ProblemWithTests {
     starterCpp: record.starterCpp,
     visibility: record.visibility,
     reviewNote: record.reviewNote,
+    tags: record.tags,
+    seedKey: record.seedKey,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     authorDisplayName: record.author.displayName,
@@ -96,6 +99,7 @@ function toMatch(record: MatchRecord): MatchWithPlayers {
     playerBEloBefore: record.playerBEloBefore,
     playerAEloAfter: record.playerAEloAfter,
     playerBEloAfter: record.playerBEloAfter,
+    endedReason: record.endedReason,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     playerA: toUser(record.playerA),
@@ -163,6 +167,7 @@ export class PrismaMatchRepository implements IMatchRepository {
         winnerId: data.winnerId,
         playerAEloAfter: data.playerAEloAfter,
         playerBEloAfter: data.playerBEloAfter,
+        endedReason: data.endedReason ?? null,
       },
     })
     if (updated.count === 0) return null
@@ -176,6 +181,7 @@ export class PrismaMatchRepository implements IMatchRepository {
         userId: data.userId,
         problemId: data.problemId,
         language: data.language,
+        sourceCode: data.sourceCode,
         verdict: data.verdict as SubmissionVerdict,
         effectiveElapsedMinutes: data.effectiveElapsedMinutes,
       },
@@ -187,6 +193,7 @@ export class PrismaMatchRepository implements IMatchRepository {
       userId: record.userId,
       problemId: record.problemId,
       language: record.language,
+      sourceCode: record.sourceCode,
       verdict: record.verdict,
       effectiveElapsedMinutes: record.effectiveElapsedMinutes,
       submittedAt: record.submittedAt,
@@ -198,5 +205,62 @@ export class PrismaMatchRepository implements IMatchRepository {
       where: { matchId, verdict: "ACCEPTED" },
     })
     return count > 0
+  }
+
+  async findLatestSubmissions(matchId: string): Promise<MatchSubmissionRecord[]> {
+    const records = await prisma.matchSubmission.findMany({
+      where: { matchId },
+      orderBy: { submittedAt: "desc" },
+    })
+
+    const latestByUser = new Map<string, MatchSubmissionRecord>()
+    const acceptedByUser = new Map<string, MatchSubmissionRecord>()
+    for (const record of records) {
+      const mapped: MatchSubmissionRecord = {
+        id: record.id,
+        matchId: record.matchId,
+        userId: record.userId,
+        problemId: record.problemId,
+        language: record.language,
+        sourceCode: record.sourceCode,
+        verdict: record.verdict,
+        effectiveElapsedMinutes: record.effectiveElapsedMinutes,
+        submittedAt: record.submittedAt,
+      }
+      if (!latestByUser.has(record.userId)) latestByUser.set(record.userId, mapped)
+      if (record.verdict === "ACCEPTED" && !acceptedByUser.has(record.userId)) {
+        acceptedByUser.set(record.userId, mapped)
+      }
+    }
+
+    return [...latestByUser.keys()].map((userId) => acceptedByUser.get(userId) ?? latestByUser.get(userId)!)
+  }
+
+  async findRecentEndedByUserId(userId: string, limit: number): Promise<MatchHistoryRecord[]> {
+    const records = await prisma.match.findMany({
+      where: {
+        status: "ENDED",
+        OR: [{ playerAId: userId }, { playerBId: userId }],
+      },
+      orderBy: { endedAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        difficulty: true,
+        endedAt: true,
+        winnerId: true,
+        playerAId: true,
+        playerBId: true,
+        playerAEloBefore: true,
+        playerBEloBefore: true,
+        playerAEloAfter: true,
+        playerBEloAfter: true,
+        endedReason: true,
+        playerA: { select: { id: true, displayName: true, avatarUrl: true } },
+        playerB: { select: { id: true, displayName: true, avatarUrl: true } },
+      },
+    })
+
+    return records
   }
 }

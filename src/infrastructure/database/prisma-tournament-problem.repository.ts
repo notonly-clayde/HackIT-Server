@@ -29,6 +29,8 @@ function toEntry(record: {
     starterCpp: string | null
     visibility: "PRIVATE" | "PENDING" | "PUBLIC"
     reviewNote: string | null
+    tags: string[]
+    seedKey: string | null
     createdAt: Date
     updatedAt: Date
     author: { displayName: string }
@@ -60,6 +62,8 @@ function toEntry(record: {
       starterCpp: record.problem.starterCpp,
       visibility: record.problem.visibility,
       reviewNote: record.problem.reviewNote,
+      tags: record.problem.tags,
+      seedKey: record.problem.seedKey,
       createdAt: record.problem.createdAt,
       updatedAt: record.problem.updatedAt,
       authorDisplayName: record.problem.author.displayName,

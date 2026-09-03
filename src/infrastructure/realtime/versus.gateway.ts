@@ -50,6 +50,21 @@ export function createVersusGateway(
   const queue = new VersusMatchmakingQueue()
   const pendingLeaves = new Map<string, PendingLeave>()
   const userSockets = new Map<string, Set<string>>()
+  const rematchOffers = new Map<string, Set<string>>()
+  const rematchPresent = new Map<string, Set<string>>()
+  const drawOffers = new Map<string, string>()
+
+  const emitToUser = (userId: string, event: string, payload: unknown) => {
+    if (!io) return
+    const sockets = userSockets.get(userId)
+    if (!sockets) return
+    for (const socketId of sockets) {
+      io.to(socketId).emit(event, payload)
+    }
+  }
+
+  const opponentIdOf = (match: VersusMatchDto, userId: string) =>
+    match.playerA.id === userId ? match.playerB.id : match.playerA.id
 
   const notifyState = (match: VersusMatchDto) => {
     if (!io) return
@@ -68,12 +83,19 @@ export function createVersusGateway(
 
   const notifyEnded = (event: VersusMatchEndedDto) => {
     if (!io) return
-    const playerId = event.match.youAre === "a" ? event.match.playerA.id : event.match.playerB.id
-    const sockets = userSockets.get(playerId)
-    if (!sockets) return
-    for (const socketId of sockets) {
-      io.to(socketId).emit("versus:ended", event)
+    drawOffers.delete(event.match.id)
+    rematchOffers.delete(event.match.id)
+    if (event.match.status === "ended") {
+      const present = rematchPresent.get(event.match.id) ?? new Set<string>()
+      for (const playerId of [event.match.playerA.id, event.match.playerB.id]) {
+        if (userSockets.has(playerId)) present.add(playerId)
+      }
+      rematchPresent.set(event.match.id, present)
+    } else {
+      rematchPresent.delete(event.match.id)
     }
+    const playerId = event.match.youAre === "a" ? event.match.playerA.id : event.match.playerB.id
+    emitToUser(playerId, "versus:ended", event)
   }
 
   const attach = (server: Server) => {
@@ -154,6 +176,11 @@ export function createVersusGateway(
 
           const match = await versusService.getMatch(matchId, userId)
           await authSocket.join(`versus:${matchId}`)
+          if (match.status === "ended") {
+            const present = rematchPresent.get(matchId) ?? new Set<string>()
+            present.add(userId)
+            rematchPresent.set(matchId, present)
+          }
           if (typeof ack === "function") {
             ack({ ok: true, match })
           }
@@ -167,6 +194,141 @@ export function createVersusGateway(
         }
       })
 
+      authSocket.on("versus:rematch", async (payload, ack) => {
+        try {
+          const matchId =
+            payload && typeof payload === "object" && typeof payload.matchId === "string"
+              ? payload.matchId
+              : ""
+          if (!matchId) throw new AppError("Invalid match id", 400)
+
+          const match = await versusService.getMatch(matchId, userId)
+          if (match.status !== "ended") {
+            throw new AppError("Rematch is only available after a finished match", 400)
+          }
+
+          const opponentId = opponentIdOf(match, userId)
+          const present = rematchPresent.get(matchId) ?? new Set<string>()
+          if (!present.has(opponentId)) {
+            if (typeof ack === "function") ack({ ok: false, error: "Opponent left" })
+            authSocket.emit("versus:rematch-unavailable", { matchId })
+            return
+          }
+
+          const offers = rematchOffers.get(matchId) ?? new Set<string>()
+          offers.add(userId)
+          rematchOffers.set(matchId, offers)
+
+          if (offers.has(userId) && offers.has(opponentId)) {
+            rematchOffers.delete(matchId)
+            rematchPresent.delete(matchId)
+            const difficulty = difficultyMap[match.difficulty]
+            if (!difficulty) throw new AppError("Invalid difficulty", 400)
+            const created = await versusService.createLobbyMatch(match.playerA.id, match.playerB.id, difficulty)
+            const room = `versus:${created.id}`
+            for (const playerId of [created.playerAId, created.playerBId]) {
+              const sockets = userSockets.get(playerId)
+              if (!sockets || !io) continue
+              for (const socketId of sockets) {
+                const sock = io.sockets.sockets.get(socketId)
+                if (sock) await sock.join(room)
+              }
+              emitToUser(playerId, "versus:match-found", toVersusMatchDto(created, playerId))
+            }
+            if (typeof ack === "function") ack({ ok: true, accepted: true })
+            return
+          }
+
+          emitToUser(opponentId, "versus:rematch-offered", { matchId })
+          if (typeof ack === "function") ack({ ok: true, accepted: false })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to rematch"
+          if (typeof ack === "function") ack({ ok: false, error: message })
+        }
+      })
+
+      authSocket.on("versus:results-leave", (payload) => {
+        const matchId =
+          payload && typeof payload === "object" && typeof payload.matchId === "string"
+            ? payload.matchId
+            : ""
+        if (!matchId) return
+        const present = rematchPresent.get(matchId)
+        if (!present?.has(userId)) return
+        present.delete(userId)
+        rematchOffers.get(matchId)?.delete(userId)
+        for (const otherId of present) {
+          emitToUser(otherId, "versus:rematch-unavailable", { matchId })
+        }
+        if (present.size === 0) rematchPresent.delete(matchId)
+      })
+
+      authSocket.on("versus:draw-offer", async (payload, ack) => {
+        try {
+          const matchId =
+            payload && typeof payload === "object" && typeof payload.matchId === "string"
+              ? payload.matchId
+              : ""
+          if (!matchId) throw new AppError("Invalid match id", 400)
+
+          const match = await versusService.getMatch(matchId, userId)
+          if (match.status !== "live") {
+            throw new AppError("Draw can only be offered during a live match", 400)
+          }
+          if (drawOffers.has(matchId)) {
+            throw new AppError("A draw offer is already pending", 400)
+          }
+
+          drawOffers.set(matchId, userId)
+          const opponentId = opponentIdOf(match, userId)
+          emitToUser(opponentId, "versus:draw-offered", { matchId, fromUserId: userId })
+          if (typeof ack === "function") ack({ ok: true })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to offer draw"
+          if (typeof ack === "function") ack({ ok: false, error: message })
+        }
+      })
+
+      authSocket.on("versus:draw-respond", async (payload, ack) => {
+        try {
+          const matchId =
+            payload && typeof payload === "object" && typeof payload.matchId === "string"
+              ? payload.matchId
+              : ""
+          const accept = Boolean(payload && typeof payload === "object" && payload.accept === true)
+          if (!matchId) throw new AppError("Invalid match id", 400)
+
+          const offererId = drawOffers.get(matchId)
+          if (!offererId) {
+            throw new AppError("No draw offer pending", 400)
+          }
+
+          const match = await versusService.getMatch(matchId, userId)
+          const opponentId = opponentIdOf(match, userId)
+
+          const isOffererCancel = userId === offererId && !accept
+          const isOpponentRespond = userId !== offererId
+          if (!isOffererCancel && !isOpponentRespond) {
+            throw new AppError("You already offered this draw", 400)
+          }
+
+          drawOffers.delete(matchId)
+
+          if (!accept) {
+            const notifyId = isOffererCancel ? opponentId : offererId
+            emitToUser(notifyId, "versus:draw-declined", { matchId })
+            if (typeof ack === "function") ack({ ok: true, accepted: false })
+            return
+          }
+
+          await versusService.agreeDraw(matchId, userId)
+          if (typeof ack === "function") ack({ ok: true, accepted: true })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to respond to draw"
+          if (typeof ack === "function") ack({ ok: false, error: message })
+        }
+      })
+
       authSocket.on("disconnect", () => {
         const set = userSockets.get(userId)
         if (set) {
@@ -174,8 +336,20 @@ export function createVersusGateway(
           if (set.size === 0) userSockets.delete(userId)
         }
 
-        // Only drop from queue if no other sockets remain for this user
         if (!userSockets.has(userId)) {
+          for (const [matchId, present] of rematchPresent) {
+            if (!present.has(userId)) continue
+            present.delete(userId)
+            rematchOffers.get(matchId)?.delete(userId)
+            for (const otherId of present) {
+              emitToUser(otherId, "versus:rematch-unavailable", { matchId })
+            }
+          }
+          for (const [matchId, offererId] of drawOffers) {
+            if (offererId !== userId) continue
+            drawOffers.delete(matchId)
+          }
+
           const queued = queue.get(userId)
           if (queued) {
             const timer = setTimeout(() => {

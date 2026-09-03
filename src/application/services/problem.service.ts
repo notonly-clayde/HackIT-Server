@@ -26,6 +26,7 @@ export class ProblemService {
       visibility: "PUBLIC",
       search: query.search,
       difficulty: query.difficulty ? difficultyMap[query.difficulty] : undefined,
+      tag: query.tag,
     })
   }
 
@@ -51,6 +52,7 @@ export class ProblemService {
       starterPython: input.starterPython,
       starterJs: input.starterJs,
       starterCpp: input.starterCpp,
+      tags: input.tags,
       testCases: input.testCases.map((test, index) => ({
         input: test.input,
         expectedOutput: test.expectedOutput,
@@ -116,6 +118,7 @@ export class ProblemService {
       ...(input.starterPython !== undefined ? { starterPython: input.starterPython } : {}),
       ...(input.starterJs !== undefined ? { starterJs: input.starterJs } : {}),
       ...(input.starterCpp !== undefined ? { starterCpp: input.starterCpp } : {}),
+      ...(input.tags !== undefined ? { tags: input.tags } : {}),
       ...(input.testCases
         ? {
             testCases: input.testCases.map((test, index) => ({

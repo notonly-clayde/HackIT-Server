@@ -39,6 +39,8 @@ function toProblemWithTests(record: ProblemRecord): ProblemWithTests {
     starterCpp: record.starterCpp,
     visibility: record.visibility,
     reviewNote: record.reviewNote,
+    tags: record.tags,
+    seedKey: record.seedKey,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     authorDisplayName: record.author.displayName,
@@ -66,6 +68,10 @@ function buildWhere(filters: ProblemFilters): Prisma.ProblemWhereInput {
 
   if (filters.difficulty) {
     where.difficulty = filters.difficulty
+  }
+
+  if (filters.tag) {
+    where.tags = { has: filters.tag }
   }
 
   if (filters.search?.trim()) {
@@ -107,6 +113,7 @@ export class PrismaProblemRepository implements IProblemRepository {
         starterPython: data.starterPython ?? null,
         starterJs: data.starterJs ?? null,
         starterCpp: data.starterCpp ?? null,
+        tags: data.tags,
         visibility: "PRIVATE",
         testCases: {
           create: data.testCases.map((test, index) => ({
@@ -140,6 +147,7 @@ export class PrismaProblemRepository implements IProblemRepository {
           ...(data.starterPython !== undefined ? { starterPython: data.starterPython } : {}),
           ...(data.starterJs !== undefined ? { starterJs: data.starterJs } : {}),
           ...(data.starterCpp !== undefined ? { starterCpp: data.starterCpp } : {}),
+          ...(data.tags !== undefined ? { tags: data.tags } : {}),
           ...(data.testCases
             ? {
                 testCases: {

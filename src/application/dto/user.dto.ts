@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { VersusDifficultyDto, VersusEndedReason } from "./versus.dto.js"
 
 export const updateUserSchema = z
   .object({
@@ -54,4 +55,22 @@ export type PublicUserResponseDto = {
   draws: number
   matchCount: number
   createdAt: string
+}
+
+export type MatchHistoryOpponentDto = {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+export type MatchHistoryItemDto = {
+  matchId: string
+  endedAt: string
+  difficulty: VersusDifficultyDto
+  endedReason: VersusEndedReason | null
+  result: "win" | "loss" | "draw"
+  eloBefore: number
+  eloAfter: number
+  eloDelta: number
+  opponent: MatchHistoryOpponentDto
 }

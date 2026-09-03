@@ -1,16 +1,23 @@
 import type { UpdateUserProfileInput, User } from "../../domain/entities/user.entity.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
+import type { IMatchRepository } from "../../domain/repositories/match.repository.js"
 import {
   ACTIVITY_ACTIONS,
   ACTIVITY_TARGET_TYPES,
 } from "../../domain/entities/activity-log.entity.js"
 import { NotFoundError } from "../../shared/errors/app-error.js"
 import type { ActivityLogService } from "./activity-log.service.js"
+import { toMatchHistoryItemDto } from "../mappers/versus.mapper.js"
+import type { MatchHistoryItemDto } from "../dto/user.dto.js"
+
+const DEFAULT_MATCH_HISTORY_LIMIT = 20
+const MAX_MATCH_HISTORY_LIMIT = 50
 
 export class UserService {
   constructor(
     private readonly userRepository: IUserRepository,
     private readonly activityLogService: ActivityLogService,
+    private readonly matchRepository: IMatchRepository,
   ) {}
 
   async getMe(userId: string): Promise<{ user: User; activeWarn: Awaited<ReturnType<IUserRepository["findLatestWarn"]>> }> {
@@ -67,5 +74,19 @@ export class UserService {
       metadata: { warnId: actionId },
     })
     return action
+  }
+
+  async listMatchHistory(userId: string, rawLimit?: number): Promise<MatchHistoryItemDto[]> {
+    const user = await this.userRepository.findById(userId)
+    if (!user) {
+      throw new NotFoundError("User not found")
+    }
+
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(MAX_MATCH_HISTORY_LIMIT, Math.max(1, Math.floor(rawLimit!)))
+      : DEFAULT_MATCH_HISTORY_LIMIT
+
+    const matches = await this.matchRepository.findRecentEndedByUserId(userId, limit)
+    return matches.map((match) => toMatchHistoryItemDto(match, userId))
   }
 }

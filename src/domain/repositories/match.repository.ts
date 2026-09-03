@@ -1,6 +1,7 @@
 import type {
   CreateMatchData,
   CreateMatchSubmissionData,
+  MatchHistoryRecord,
   MatchRecord,
   MatchStatus,
   MatchSubmissionRecord,
@@ -13,6 +14,7 @@ export type SettleMatchData = {
   playerBEloAfter: number
   endedAt: Date
   status?: "ENDED" | "ABORTED"
+  endedReason?: string | null
 }
 
 export interface IMatchRepository {
@@ -23,4 +25,6 @@ export interface IMatchRepository {
   settle(id: string, fromStatuses: MatchStatus[], data: SettleMatchData): Promise<MatchWithPlayers | null>
   createSubmission(data: CreateMatchSubmissionData): Promise<MatchSubmissionRecord>
   hasAccepted(matchId: string): Promise<boolean>
+  findLatestSubmissions(matchId: string): Promise<MatchSubmissionRecord[]>
+  findRecentEndedByUserId(userId: string, limit: number): Promise<MatchHistoryRecord[]>
 }

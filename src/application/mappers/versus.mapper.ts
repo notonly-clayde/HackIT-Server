@@ -1,7 +1,8 @@
-import type { MatchWithPlayers } from "../../domain/entities/match.entity.js"
+import type { MatchHistoryRecord, MatchWithPlayers } from "../../domain/entities/match.entity.js"
 import type { User } from "../../domain/entities/user.entity.js"
 import { toPlayerProblemDetailDto } from "./problem.mapper.js"
-import type { VersusMatchDto, VersusPlayerCardDto } from "../dto/versus.dto.js"
+import type { MatchHistoryItemDto } from "../dto/user.dto.js"
+import type { VersusEndedReason, VersusMatchDto, VersusPlayerCardDto } from "../dto/versus.dto.js"
 
 const statusLabels = {
   LOBBY: "lobby",
@@ -35,7 +36,22 @@ export function toVersusPlayerCardDto(user: User): VersusPlayerCardDto {
   }
 }
 
-export function toVersusMatchDto(match: MatchWithPlayers, viewerId: string): VersusMatchDto {
+function parseEndedReason(raw: string | null, status: MatchWithPlayers["status"]): VersusEndedReason | null {
+  if (status === "ABORTED") return "abort"
+  if (raw === "first_ac" || raw === "timeout" || raw === "forfeit" || raw === "agreed_draw" || raw === "abort") {
+    return raw
+  }
+  if (status === "ENDED") {
+    return raw ? "timeout" : null
+  }
+  return null
+}
+
+export function toVersusMatchDto(
+  match: MatchWithPlayers,
+  viewerId: string,
+  extras?: { solveElapsedMinutes?: number | null },
+): VersusMatchDto {
   const includeProblem = match.status === "LIVE" || match.status === "ENDED"
 
   return {
@@ -47,6 +63,7 @@ export function toVersusMatchDto(match: MatchWithPlayers, viewerId: string): Ver
     startedAt: match.startedAt?.toISOString() ?? null,
     endedAt: match.endedAt?.toISOString() ?? null,
     winnerId: match.winnerId,
+    endedReason: parseEndedReason(match.endedReason, match.status),
     youAre: match.playerAId === viewerId ? "a" : "b",
     playerA: toVersusPlayerCardDto(match.playerA),
     playerB: toVersusPlayerCardDto(match.playerB),
@@ -55,5 +72,31 @@ export function toVersusMatchDto(match: MatchWithPlayers, viewerId: string): Ver
     playerAEloAfter: match.playerAEloAfter,
     playerBEloAfter: match.playerBEloAfter,
     problem: includeProblem ? toPlayerProblemDetailDto(match.problem) : null,
+    solveElapsedMinutes: extras?.solveElapsedMinutes ?? null,
+  }
+}
+
+export function toMatchHistoryItemDto(match: MatchHistoryRecord, profileUserId: string): MatchHistoryItemDto {
+  const isA = match.playerAId === profileUserId
+  const before = isA ? match.playerAEloBefore : match.playerBEloBefore
+  const after = (isA ? match.playerAEloAfter : match.playerBEloAfter) ?? before
+  const opponent = isA ? match.playerB : match.playerA
+  const result: MatchHistoryItemDto["result"] =
+    match.winnerId === profileUserId ? "win" : match.winnerId ? "loss" : "draw"
+
+  return {
+    matchId: match.id,
+    endedAt: (match.endedAt ?? new Date(0)).toISOString(),
+    difficulty: difficultyLabels[match.difficulty],
+    endedReason: parseEndedReason(match.endedReason, "ENDED"),
+    result,
+    eloBefore: before,
+    eloAfter: after,
+    eloDelta: after - before,
+    opponent: {
+      id: opponent.id,
+      displayName: opponent.displayName,
+      avatarUrl: opponent.avatarUrl,
+    },
   }
 }

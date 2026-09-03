@@ -1,4 +1,15 @@
 import { z } from "zod"
+import { PROBLEM_TAG_SLUGS } from "../../shared/problems/tags.js"
+
+const problemTagSchema = z.enum(PROBLEM_TAG_SLUGS)
+
+const tagsSchema = z
+  .array(problemTagSchema)
+  .min(1)
+  .max(5)
+  .refine((tags) => new Set(tags).size === tags.length, {
+    message: "Tags must be unique",
+  })
 
 const testCaseSchema = z.object({
   input: z.string(),
@@ -10,6 +21,7 @@ const testCaseSchema = z.object({
 export const problemListQuerySchema = z.object({
   search: z.string().optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  tag: problemTagSchema.optional(),
 })
 
 export type ProblemListQueryDto = z.infer<typeof problemListQuerySchema>
@@ -23,6 +35,7 @@ export const createProblemSchema = z.object({
   starterPython: z.string().max(10000).nullable().optional(),
   starterJs: z.string().max(10000).nullable().optional(),
   starterCpp: z.string().max(10000).nullable().optional(),
+  tags: tagsSchema,
   testCases: z.array(testCaseSchema).min(1),
 })
 
@@ -38,6 +51,7 @@ export const updateProblemSchema = z
     starterPython: z.string().max(10000).nullable().optional(),
     starterJs: z.string().max(10000).nullable().optional(),
     starterCpp: z.string().max(10000).nullable().optional(),
+    tags: tagsSchema.optional(),
     testCases: z.array(testCaseSchema).min(1).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
@@ -70,6 +84,7 @@ export type ProblemSummaryDto = {
   author: string
   timeLimitMs: number
   memoryLimitMb: number
+  tags: string[]
   createdAt: string
   reviewNote?: string | null
 }

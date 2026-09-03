@@ -47,6 +47,7 @@ export function toProblemSummaryDto(
     author: problem.authorDisplayName,
     timeLimitMs: problem.timeLimitMs,
     memoryLimitMb: problem.memoryLimitMb,
+    tags: problem.tags,
     createdAt: problem.createdAt.toISOString(),
     ...(options.includeReviewNote ? { reviewNote: problem.reviewNote } : {}),
   }

@@ -23,6 +23,8 @@ export type Problem = {
   starterCpp: string | null
   visibility: ProblemVisibility
   reviewNote: string | null
+  tags: string[]
+  seedKey: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -40,6 +42,7 @@ export type ProblemFilters = {
   difficulty?: ProblemDifficulty
   visibility?: ProblemVisibility
   authorId?: string
+  tag?: string
 }
 
 export type CreateProblemData = {
@@ -52,6 +55,7 @@ export type CreateProblemData = {
   starterPython?: string | null
   starterJs?: string | null
   starterCpp?: string | null
+  tags: string[]
   testCases: {
     input: string
     expectedOutput: string
@@ -69,6 +73,7 @@ export type UpdateProblemData = {
   starterPython?: string | null
   starterJs?: string | null
   starterCpp?: string | null
+  tags?: string[]
   testCases?: {
     input: string
     expectedOutput: string

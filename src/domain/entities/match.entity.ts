@@ -27,6 +27,7 @@ export type MatchRecord = {
   playerBEloBefore: number
   playerAEloAfter: number | null
   playerBEloAfter: number | null
+  endedReason: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -35,6 +36,28 @@ export type MatchWithPlayers = MatchRecord & {
   playerA: User
   playerB: User
   problem: ProblemWithTests
+}
+
+export type MatchHistoryOpponent = {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+export type MatchHistoryRecord = {
+  id: string
+  difficulty: ProblemDifficulty
+  endedAt: Date | null
+  winnerId: string | null
+  playerAId: string
+  playerBId: string
+  playerAEloBefore: number
+  playerBEloBefore: number
+  playerAEloAfter: number | null
+  playerBEloAfter: number | null
+  endedReason: string | null
+  playerA: MatchHistoryOpponent
+  playerB: MatchHistoryOpponent
 }
 
 export type CreateMatchData = {
@@ -54,6 +77,7 @@ export type MatchSubmissionRecord = {
   userId: string
   problemId: string
   language: string
+  sourceCode: string
   verdict: SubmissionVerdict
   effectiveElapsedMinutes: number
   submittedAt: Date
@@ -64,6 +88,7 @@ export type CreateMatchSubmissionData = {
   userId: string
   problemId: string
   language: string
+  sourceCode: string
   verdict: SubmissionVerdict
   effectiveElapsedMinutes: number
 }

@@ -10,7 +10,8 @@
     "db:migrate": "node scripts/prisma-neon.mjs migrate dev",
     "db:migrate:deploy": "node scripts/prisma-neon.mjs migrate deploy",
     "db:studio": "node scripts/prisma-neon.mjs studio",
-    "db:verify-admins": "node scripts/verify-neon-admin-emails.mjs"
+    "db:verify-admins": "node scripts/verify-neon-admin-emails.mjs",
+    "db:seed": "tsx scripts/seed-catalog.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^6.19.0",

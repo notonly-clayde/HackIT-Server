@@ -6,6 +6,8 @@ export const versusDifficultySchema = z.enum(["easy", "medium", "hard"])
 
 export type VersusDifficultyDto = z.infer<typeof versusDifficultySchema>
 
+export type VersusEndedReason = "first_ac" | "timeout" | "forfeit" | "agreed_draw" | "abort"
+
 export type VersusPlayerCardDto = {
   id: string
   displayName: string
@@ -29,6 +31,7 @@ export type VersusMatchDto = {
   startedAt: string | null
   endedAt: string | null
   winnerId: string | null
+  endedReason: VersusEndedReason | null
   youAre: "a" | "b"
   playerA: VersusPlayerCardDto
   playerB: VersusPlayerCardDto
@@ -37,14 +40,34 @@ export type VersusMatchDto = {
   playerAEloAfter: number | null
   playerBEloAfter: number | null
   problem: ProblemDetailDto | null
+  solveElapsedMinutes: number | null
 }
 
 export type VersusMatchEndedDto = {
   match: VersusMatchDto
   result: "win" | "loss" | "draw" | "abort"
   yourEloDelta: number
+  endedReason: VersusEndedReason
+  solveElapsedMinutes: number | null
 }
 
 export type VersusSubmissionResultDto = SubmissionResultDto & {
   matchEnded?: VersusMatchEndedDto
+}
+
+export type VersusReviewSubmissionDto = {
+  userId: string
+  displayName: string
+  language: string
+  sourceCode: string
+  verdict: string
+  effectiveElapsedMinutes: number
+  submittedAt: string
+}
+
+export type VersusReviewDto = {
+  matchId: string
+  problem: ProblemDetailDto
+  you: VersusReviewSubmissionDto | null
+  opponent: VersusReviewSubmissionDto | null
 }

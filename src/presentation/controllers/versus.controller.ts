@@ -13,6 +13,13 @@ export class VersusController {
     res.json(match)
   }
 
+  getReview = async (req: Request, res: Response) => {
+    const auth = this.requireAuth(req)
+    const matchId = this.requireId(req.params.id)
+    const review = await this.versusService.getReview(matchId, auth.userId)
+    res.json(review)
+  }
+
   run = async (req: Request, res: Response) => {
     const auth = this.requireAuth(req)
     const matchId = this.requireId(req.params.id)

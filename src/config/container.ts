@@ -381,7 +381,7 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
 
 
 
-  const userService = new UserService(userRepository, activityLogService)
+  const userService = new UserService(userRepository, activityLogService, matchRepository)
 
 
 

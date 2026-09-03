@@ -23,6 +23,15 @@ export class UserController {
     res.json(toPublicUserResponseDto(user))
   }
 
+  listMatches = async (req: Request, res: Response) => {
+    const id = req.params.id
+    if (!id || Array.isArray(id)) throw new BadRequestError("Invalid user id")
+    const raw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit
+    const parsed = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : undefined
+    const matches = await this.userService.listMatchHistory(id, parsed)
+    res.json(matches)
+  }
+
   updateMe = async (req: Request, res: Response) => {
     const parsed = updateUserSchema.safeParse(req.body)
 

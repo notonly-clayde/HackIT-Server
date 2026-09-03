@@ -5,7 +5,8 @@ import type { IMatchRepository } from "../../domain/repositories/match.repositor
 import type { IProblemRepository } from "../../domain/repositories/problem.repository.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
 import type { SubmitSolutionDto, SubmissionResultDto, RunSolutionResultDto } from "../dto/submission.dto.js"
-import type { VersusMatchDto, VersusMatchEndedDto, VersusSubmissionResultDto } from "../dto/versus.dto.js"
+import type { VersusMatchDto, VersusMatchEndedDto, VersusReviewDto, VersusSubmissionResultDto } from "../dto/versus.dto.js"
+import { toPlayerProblemDetailDto } from "../mappers/problem.mapper.js"
 import { toVersusMatchDto } from "../mappers/versus.mapper.js"
 import { CodeJudgeService } from "./code-judge.service.js"
 import {
@@ -74,7 +75,41 @@ export class VersusService {
 
   async getMatch(matchId: string, userId: string): Promise<VersusMatchDto> {
     const match = await this.requireParticipant(matchId, userId)
-    return toVersusMatchDto(match, userId)
+    const solveElapsedMinutes = await this.resolveSolveMinutes(match)
+    return toVersusMatchDto(match, userId, { solveElapsedMinutes })
+  }
+
+  async getReview(matchId: string, userId: string): Promise<VersusReviewDto> {
+    const match = await this.requireParticipant(matchId, userId)
+    if (match.status !== "ENDED") {
+      throw new ForbiddenError("Match review is available after the match ends")
+    }
+
+    const submissions = await this.matchRepository.findLatestSubmissions(matchId)
+    const you = match.playerAId === userId ? match.playerA : match.playerB
+    const opponent = match.playerAId === userId ? match.playerB : match.playerA
+    const yourSub = submissions.find((item) => item.userId === you.id) ?? null
+    const oppSub = submissions.find((item) => item.userId === opponent.id) ?? null
+
+    const mapSub = (sub: (typeof submissions)[number] | null, player: User) =>
+      sub
+        ? {
+            userId: player.id,
+            displayName: player.displayName,
+            language: sub.language,
+            sourceCode: sub.sourceCode,
+            verdict: sub.verdict.toLowerCase(),
+            effectiveElapsedMinutes: sub.effectiveElapsedMinutes,
+            submittedAt: sub.submittedAt.toISOString(),
+          }
+        : null
+
+    return {
+      matchId: match.id,
+      problem: toPlayerProblemDetailDto(match.problem),
+      you: mapSub(yourSub, you),
+      opponent: mapSub(oppSub, opponent),
+    }
   }
 
   async startLive(matchId: string): Promise<MatchWithPlayers | null> {
@@ -109,7 +144,7 @@ export class VersusService {
     }
 
     const winnerId = match.playerAId === userId ? match.playerBId : match.playerAId
-    const settled = await this.settleMatch(match, winnerId)
+    const settled = await this.settleMatch(match, winnerId, "forfeit")
     return this.toEndedDto(settled, userId)
   }
 
@@ -161,6 +196,7 @@ export class VersusService {
       userId,
       problemId: match.problemId,
       language: input.language,
+      sourceCode: input.sourceCode,
       verdict: mappedVerdict,
       effectiveElapsedMinutes,
     })
@@ -169,10 +205,10 @@ export class VersusService {
       return verdict
     }
 
-    const settled = await this.settleMatch(match, userId)
+    const settled = await this.settleMatch(match, userId, "first_ac")
     return {
       ...verdict,
-      matchEnded: this.toEndedDto(settled, userId),
+      matchEnded: await this.toEndedDto(settled, userId),
     }
   }
 
@@ -205,7 +241,13 @@ export class VersusService {
   private async timeoutMatch(match: MatchWithPlayers): Promise<void> {
     const hasAccepted = await this.matchRepository.hasAccepted(match.id)
     if (hasAccepted) return
-    await this.settleMatch(match, null)
+    await this.settleMatch(match, null, "timeout")
+  }
+
+  async agreeDraw(matchId: string, userId: string): Promise<VersusMatchEndedDto> {
+    const match = await this.requireLiveParticipant(matchId, userId)
+    const settled = await this.settleMatch(match, null, "agreed_draw")
+    return this.toEndedDto(settled, userId)
   }
 
   /** Cancel a lobby match with no winner, loser, tie, or ELO change. */
@@ -220,6 +262,7 @@ export class VersusService {
       playerBEloAfter: match.playerBEloBefore,
       endedAt: new Date(),
       status: "ABORTED",
+      endedReason: "abort",
     })
 
     if (!settled) {
@@ -229,7 +272,7 @@ export class VersusService {
     }
 
     for (const playerId of [settled.playerAId, settled.playerBId]) {
-      const dto = this.toEndedDto(settled, playerId)
+      const dto = await this.toEndedDto(settled, playerId)
       this.matchNotifier.notifyEnded(dto)
       this.matchNotifier.notifyState(dto.match)
     }
@@ -240,6 +283,7 @@ export class VersusService {
   private async settleMatch(
     match: MatchWithPlayers,
     winnerId: string | null,
+    endedReason: "first_ac" | "timeout" | "forfeit" | "agreed_draw",
   ): Promise<MatchWithPlayers> {
     if (match.status === "ENDED" || match.status === "ABORTED") {
       return match
@@ -271,6 +315,7 @@ export class VersusService {
         playerBEloAfter: bAfter,
         endedAt: new Date(),
         status: "ENDED",
+        endedReason,
       },
     )
 
@@ -286,7 +331,7 @@ export class VersusService {
     const refreshed = (await this.matchRepository.findById(settled.id)) ?? settled
 
     for (const playerId of [refreshed.playerAId, refreshed.playerBId]) {
-      const dto = this.toEndedDto(refreshed, playerId)
+      const dto = await this.toEndedDto(refreshed, playerId)
       this.matchNotifier.notifyEnded(dto)
       this.matchNotifier.notifyState(dto.match)
     }
@@ -310,8 +355,9 @@ export class VersusService {
     })
   }
 
-  private toEndedDto(match: MatchWithPlayers, userId: string): VersusMatchEndedDto {
-    const matchDto = toVersusMatchDto(match, userId)
+  private async toEndedDto(match: MatchWithPlayers, userId: string): Promise<VersusMatchEndedDto> {
+    const solveElapsedMinutes = await this.resolveSolveMinutes(match)
+    const matchDto = toVersusMatchDto(match, userId, { solveElapsedMinutes })
     const isA = match.playerAId === userId
     const before = isA ? match.playerAEloBefore : match.playerBEloBefore
     const after = isA ? (match.playerAEloAfter ?? before) : (match.playerBEloAfter ?? before)
@@ -321,6 +367,8 @@ export class VersusService {
         match: matchDto,
         result: "abort",
         yourEloDelta: 0,
+        endedReason: "abort",
+        solveElapsedMinutes: null,
       }
     }
 
@@ -328,11 +376,32 @@ export class VersusService {
     if (match.winnerId === userId) result = "win"
     else if (match.winnerId) result = "loss"
 
+    const endedReason =
+      match.endedReason === "first_ac" ||
+      match.endedReason === "timeout" ||
+      match.endedReason === "forfeit" ||
+      match.endedReason === "agreed_draw"
+        ? match.endedReason
+        : result === "draw"
+          ? "timeout"
+          : "first_ac"
+
     return {
       match: matchDto,
       result,
       yourEloDelta: after - before,
+      endedReason,
+      solveElapsedMinutes,
     }
+  }
+
+  private async resolveSolveMinutes(match: MatchWithPlayers): Promise<number | null> {
+    if (!match.winnerId) return null
+    const submissions = await this.matchRepository.findLatestSubmissions(match.id)
+    const accepted = submissions.find(
+      (item) => item.userId === match.winnerId && item.verdict === "ACCEPTED",
+    )
+    return accepted?.effectiveElapsedMinutes ?? null
   }
 
   private async pickRandomProblem(difficulty: ProblemDifficulty) {
