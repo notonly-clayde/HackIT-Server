@@ -117,16 +117,20 @@ export class VersusService {
     const match = await this.matchRepository.startLive(matchId, startedAt)
     if (!match) return null
 
-    this.matchNotifier.notifyStarted({
-      matchId: match.id,
-      status: "live",
-      startedAt: startedAt.toISOString(),
-      playerAId: match.playerAId,
-      playerBId: match.playerBId,
-    })
+    try {
+      this.matchNotifier.notifyStarted({
+        matchId: match.id,
+        status: "live",
+        startedAt: startedAt.toISOString(),
+        playerAId: match.playerAId,
+        playerBId: match.playerBId,
+      })
 
-    for (const playerId of [match.playerAId, match.playerBId]) {
-      this.matchNotifier.notifyState(toVersusMatchDto(match, playerId))
+      for (const playerId of [match.playerAId, match.playerBId]) {
+        this.matchNotifier.notifyState(toVersusMatchDto(match, playerId))
+      }
+    } catch (error) {
+      console.error(`[versus] failed to notify start for match ${matchId}`, error)
     }
 
     return match
@@ -221,7 +225,11 @@ export class VersusService {
 
     for (const match of lobbyMatches) {
       if (match.lobbyEndsAt.getTime() <= now) {
-        await this.startLive(match.id)
+        try {
+          await this.startLive(match.id)
+        } catch (error) {
+          console.error(`[versus] failed to promote lobby match ${match.id}`, error)
+        }
       }
     }
 
@@ -229,7 +237,11 @@ export class VersusService {
       if (!match.startedAt) continue
       const endsAt = match.startedAt.getTime() + match.durationMinutes * 60_000
       if (endsAt <= now) {
-        await this.timeoutMatch(match)
+        try {
+          await this.timeoutMatch(match)
+        } catch (error) {
+          console.error(`[versus] failed to timeout match ${match.id}`, error)
+        }
       }
     }
   }

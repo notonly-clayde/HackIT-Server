@@ -1,809 +1,100 @@
 generator client {
-
   provider = "prisma-client-js"
-
 }
-
-
 
 datasource db {
-
   provider = "postgresql"
-
   url      = env("DATABASE_URL")
-
 }
-
-
-
-enum UserRole {
-
-  USER
-
-  ADMIN
-
-}
-
-
-
-enum UserStatus {
-
-  ACTIVE
-
-  SUSPENDED
-
-}
-
-
-
-enum ReportTargetType {
-
-  USER
-
-  TOURNAMENT
-
-  PROBLEM
-
-}
-
-
-
-enum ReportCategory {
-
-  HARASSMENT
-
-  HATE
-
-  SEXUAL
-
-  SPAM
-
-  CHEATING
-
-  OTHER
-
-}
-
-
-
-enum ReportStatus {
-
-  OPEN
-
-  RESOLVED
-
-  DISMISSED
-
-}
-
-
-
-enum ModerationActionType {
-
-  WARN
-
-  SUSPEND
-
-  UNSUSPEND
-
-  PROMOTE
-
-  DEMOTE
-
-}
-
-
-
-enum ActivityActorType {
-
-  USER
-
-  SYSTEM
-
-}
-
-
 
 enum BattleType {
-
   ONE_V_ONE
-
   FREE_FOR_ALL
-
 }
-
-
 
 enum TournamentStatus {
-
   OPEN
-
   SOON
-
   LIVE
-
   ENDED
-
 }
-
-
 
 enum Visibility {
-
   PUBLIC
-
   PRIVATE
-
 }
-
-
 
 enum StartMode {
-
   MANUAL
-
   AUTO
-
 }
-
-
 
 enum TournamentPlayerRole {
-
   PLAYER
-
   HOST
-
   MOD
-
 }
-
-
-
-enum ProblemDifficulty {
-
-  EASY
-
-  MEDIUM
-
-  HARD
-
-}
-
-
-
-enum ProblemVisibility {
-
-  PRIVATE
-
-  PENDING
-
-  PUBLIC
-
-}
-
-
-
-enum SubmissionVerdict {
-
-  ACCEPTED
-
-  WRONG_ANSWER
-
-  RUNTIME_ERROR
-
-  TIMEOUT
-
-  COMPILE_ERROR
-
-  UNSUPPORTED
-
-}
-
-
-
-enum MatchStatus {
-
-  LOBBY
-
-  LIVE
-
-  ENDED
-
-  ABORTED
-
-}
-
-
 
 model User {
-
   id             String   @id
-
   email          String   @unique
-
   name           String
-
   displayName    String
-
   avatarUrl      String?
-
   bio            String?
-
   emailVerified  Boolean  @default(false)
-
-  role           UserRole   @default(USER)
-
-  status         UserStatus @default(ACTIVE)
-
-  suspendedAt    DateTime?
-
-  suspendReason  String?
-
   elo1v1         Int      @default(1200)
-
   eloTournament  Int      @default(1200)
-
-  peakElo1v1     Int      @default(1200)
-
-  winStreak1v1   Int      @default(0)
-
   wins           Int      @default(0)
-
-  draws          Int      @default(0)
-
   matchCount     Int      @default(0)
-
   createdAt      DateTime @default(now())
-
   updatedAt      DateTime @updatedAt
-
   lastSyncedAt   DateTime @default(now())
 
-
-
   hostedTournaments     Tournament[]           @relation("TournamentHost")
-
   moderatedTournaments  TournamentModerator[]
-
   tournamentPlayers     TournamentPlayer[]
-
-  tournamentSubmissions TournamentSubmission[]
-
-  tournamentSessions    TournamentPlayerSession[]
-
-  tournamentWorkspaces  TournamentWorkspace[]
-
-  authoredProblems      Problem[]
-
-  reportsFiled          Report[]               @relation("ReportReporter")
-
-  reportsResolved       Report[]               @relation("ReportResolver")
-
-  moderationActionsTaken ModerationAction[]    @relation("ModerationActor")
-
-  moderationActionsReceived ModerationAction[] @relation("ModerationSubject")
-
-  activityLogs           ActivityLog[]
-
-  matchesAsPlayerA       Match[]               @relation("MatchPlayerA")
-
-  matchesAsPlayerB       Match[]               @relation("MatchPlayerB")
-
-  matchesWon             Match[]               @relation("MatchWinner")
-
-  matchSubmissions       MatchSubmission[]
-
 }
-
-
-
-model Report {
-
-  id                   String           @id @default(cuid())
-
-  reporterId           String
-
-  reporter             User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-
-  targetType           ReportTargetType
-
-  targetId             String
-
-  contextTournamentId  String?
-
-  category             ReportCategory
-
-  details              String
-
-  status               ReportStatus     @default(OPEN)
-
-  resolutionNote       String?
-
-  resolvedById         String?
-
-  resolvedBy           User?            @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-
-  resolvedAt           DateTime?
-
-  createdAt            DateTime         @default(now())
-
-
-
-  @@index([status])
-
-  @@index([targetType, targetId])
-
-  @@index([reporterId])
-
-}
-
-
-
-model ModerationAction {
-
-  id            String               @id @default(cuid())
-
-  actorId       String
-
-  actor         User                 @relation("ModerationActor", fields: [actorId], references: [id], onDelete: Cascade)
-
-  subjectUserId String
-
-  subject       User                 @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: Cascade)
-
-  type          ModerationActionType
-
-  note          String?
-
-  acknowledgedAt DateTime?
-
-  createdAt     DateTime             @default(now())
-
-
-
-  @@index([subjectUserId, createdAt])
-
-  @@index([actorId])
-
-}
-
-
-
-model ActivityLog {
-
-  id           String            @id @default(cuid())
-
-  action       String
-
-  actorType    ActivityActorType @default(USER)
-
-  actorId      String?
-
-  actor        User?             @relation(fields: [actorId], references: [id], onDelete: SetNull)
-
-  targetType   String
-
-  targetId     String
-
-  tournamentId String?
-
-  summary      String
-
-  metadata     Json?
-
-  createdAt    DateTime          @default(now())
-
-
-
-  @@index([createdAt])
-
-  @@index([action, createdAt])
-
-  @@index([actorId, createdAt])
-
-  @@index([targetType, targetId])
-
-  @@index([tournamentId, createdAt])
-
-}
-
-
 
 model Tournament {
-
   id                String           @id @default(cuid())
-
   name              String
-
   type              BattleType
-
   scheduledAt       DateTime
-
   status            TournamentStatus
-
   playerCount       Int              @default(0)
-
   maxPlayers        Int
-
   durationMinutes   Int
-
   description       String
-
   visibility        Visibility
-
   startMode         StartMode
-
   passwordProtected Boolean          @default(false)
-
   passwordHash      String?
-
   hostId            String
-
   host              User             @relation("TournamentHost", fields: [hostId], references: [id])
-
-  liveStartedAt     DateTime?
-
-  pausedAt          DateTime?
-
-  resumeAt          DateTime?
-
-  pausedTotalMs     Int              @default(0)
-
-  endedAt           DateTime?
-
   createdAt         DateTime         @default(now())
-
   updatedAt         DateTime         @updatedAt
-
   moderators        TournamentModerator[]
-
   players           TournamentPlayer[]
-
-  problems          TournamentProblem[]
-
-  submissions       TournamentSubmission[]
-
-  playerSessions    TournamentPlayerSession[]
-
-  workspaces        TournamentWorkspace[]
-
 }
-
-
 
 model TournamentModerator {
-
   tournamentId String
-
   userId       String
-
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-
-
   @@id([tournamentId, userId])
-
 }
-
-
 
 model TournamentPlayer {
-
   tournamentId String
-
   userId       String
-
   role         TournamentPlayerRole @default(PLAYER)
-
   joinedAt     DateTime             @default(now())
 
-
-
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-
 
   @@id([tournamentId, userId])
-
 }
-
-
-
-model Problem {
-
-  id             String            @id @default(cuid())
-
-  authorId       String
-
-  author         User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
-
-  title          String
-
-  statement      String
-
-  difficulty     ProblemDifficulty @default(MEDIUM)
-
-  timeLimitMs    Int               @default(2000)
-
-  memoryLimitMb  Int               @default(256)
-
-  starterPython  String?
-
-  starterJs      String?
-
-  starterCpp     String?
-
-  visibility     ProblemVisibility @default(PRIVATE)
-
-  reviewNote     String?
-
-  tags           String[]          @default([])
-
-  seedKey        String?           @unique
-
-  createdAt      DateTime          @default(now())
-
-  updatedAt      DateTime          @updatedAt
-
-  testCases      TestCase[]
-
-  tournaments    TournamentProblem[]
-
-  submissions    TournamentSubmission[]
-
-  workspaces     TournamentWorkspace[]
-
-  matches        Match[]
-
-  matchSubmissions MatchSubmission[]
-
-
-
-  @@index([authorId])
-
-  @@index([visibility])
-
-  @@index([tags], type: Gin)
-
-}
-
-
-
-model TestCase {
-
-  id             String  @id @default(cuid())
-
-  problemId      String
-
-  problem        Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
-
-  input          String
-
-  expectedOutput String
-
-  isSample       Boolean @default(false)
-
-  order          Int     @default(0)
-
-
-
-  @@index([problemId])
-
-}
-
-
-
-model TournamentProblem {
-
-  tournamentId String
-
-  problemId    String
-
-  order        Int        @default(0)
-
-  points       Int        @default(100)
-
-  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  problem      Problem    @relation(fields: [problemId], references: [id], onDelete: Cascade)
-
-
-
-  @@id([tournamentId, problemId])
-
-  @@index([tournamentId])
-
-}
-
-
-
-model TournamentSubmission {
-
-  id                     String            @id @default(cuid())
-
-  tournamentId           String
-
-  userId                 String
-
-  problemId              String
-
-  language               String
-
-  verdict                SubmissionVerdict
-
-  effectiveElapsedMinutes Int
-
-  submittedAt            DateTime          @default(now())
-
-
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  problem    Problem    @relation(fields: [problemId], references: [id], onDelete: Cascade)
-
-
-
-  @@index([tournamentId, submittedAt])
-
-  @@index([tournamentId, userId])
-
-  @@index([tournamentId, problemId, userId])
-
-}
-
-
-
-model TournamentPlayerSession {
-
-  tournamentId    String
-
-  userId          String
-
-  activeProblemId String?
-
-  language        String   @default("python")
-
-  updatedAt       DateTime @updatedAt
-
-
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-
-
-  @@id([tournamentId, userId])
-
-}
-
-
-
-model TournamentWorkspace {
-
-  tournamentId String
-
-  userId       String
-
-  problemId    String
-
-  sourceCode   String   @db.Text
-
-  updatedAt    DateTime @updatedAt
-
-
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  problem    Problem    @relation(fields: [problemId], references: [id], onDelete: Cascade)
-
-
-
-  @@id([tournamentId, userId, problemId])
-
-}
-
-
-
-model Match {
-
-  id               String            @id @default(cuid())
-
-  playerAId        String
-
-  playerBId        String
-
-  problemId        String
-
-  difficulty       ProblemDifficulty
-
-  status           MatchStatus       @default(LOBBY)
-
-  durationMinutes  Int
-
-  lobbyEndsAt      DateTime
-
-  startedAt        DateTime?
-
-  endedAt          DateTime?
-
-  winnerId         String?
-
-  playerAEloBefore Int
-
-  playerBEloBefore Int
-
-  playerAEloAfter  Int?
-
-  playerBEloAfter  Int?
-
-  endedReason      String?
-
-  createdAt        DateTime          @default(now())
-
-  updatedAt        DateTime          @updatedAt
-
-  playerA          User              @relation("MatchPlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
-
-  playerB          User              @relation("MatchPlayerB", fields: [playerBId], references: [id], onDelete: Cascade)
-
-  winner           User?             @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
-
-  problem          Problem           @relation(fields: [problemId], references: [id], onDelete: Restrict)
-
-  submissions      MatchSubmission[]
-
-  @@index([status])
-
-  @@index([playerAId])
-
-  @@index([playerBId])
-
-  @@index([lobbyEndsAt])
-
-}
-
-
-
-model MatchSubmission {
-
-  id                      String            @id @default(cuid())
-
-  matchId                 String
-
-  userId                  String
-
-  problemId               String
-
-  language                String
-
-  sourceCode              String            @db.Text @default("")
-
-  verdict                 SubmissionVerdict
-
-  effectiveElapsedMinutes Int
-
-  submittedAt             DateTime          @default(now())
-
-  match                   Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
-
-  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  problem                 Problem           @relation(fields: [problemId], references: [id], onDelete: Cascade)
-
-  @@index([matchId, submittedAt])
-
-  @@index([matchId, userId])
-
-}
-
-

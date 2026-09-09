@@ -3,7 +3,7 @@ import type { LobbyPlayer, LobbyState } from "../entities/lobby.entity.js"
 export type JoinLobbyData = {
   tournamentId: string
   userId: string
-  role: "MOD" | "PLAYER"
+  role: "HOST" | "MOD" | "PLAYER"
 }
 
 export interface ILobbyRepository {
@@ -14,7 +14,6 @@ export interface ILobbyRepository {
   syncPlayerCount(tournamentId: string): Promise<number>
   isModerator(tournamentId: string, userId: string): Promise<boolean>
   findPasswordHash(tournamentId: string): Promise<string | null>
-  findParticipantRole(tournamentId: string, userId: string): Promise<"PLAYER" | "MOD" | null>
   findTournamentForJoin(tournamentId: string): Promise<{
     id: string
     status: "OPEN" | "SOON" | "LIVE" | "ENDED"

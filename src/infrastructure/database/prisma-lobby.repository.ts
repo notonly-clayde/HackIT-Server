@@ -40,33 +40,26 @@ function toLobbyPlayer(record: {
   }
 }
 
-async function countNonHostPlayers(tournamentId: string): Promise<number> {
-  return prisma.tournamentPlayer.count({
-    where: { tournamentId, role: { not: "HOST" } },
-  })
-}
-
 async function buildLobbyState(tournamentId: string): Promise<LobbyState | null> {
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { id: true, maxPlayers: true },
+    select: { id: true, maxPlayers: true, playerCount: true },
   })
 
   if (!tournament) return null
 
   const records = await prisma.tournamentPlayer.findMany({
-    where: { tournamentId, role: { not: "HOST" } },
+    where: { tournamentId },
     include: playerInclude,
     orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
   })
 
   const players = records.map(toLobbyPlayer)
-  const playerCount = players.length
 
   return {
     tournamentId,
     players,
-    playerCount,
+    playerCount: tournament.playerCount,
     maxPlayers: tournament.maxPlayers,
   }
 }
@@ -82,19 +75,7 @@ export class PrismaLobbyRepository implements ILobbyRepository {
       include: playerInclude,
     })
 
-    if (!record || record.role === "HOST") return null
-
-    return toLobbyPlayer(record)
-  }
-
-  async findParticipantRole(tournamentId: string, userId: string): Promise<"PLAYER" | "MOD" | null> {
-    const record = await prisma.tournamentPlayer.findUnique({
-      where: { tournamentId_userId: { tournamentId, userId } },
-      select: { role: true },
-    })
-
-    if (!record || record.role === "HOST") return null
-    return record.role
+    return record ? toLobbyPlayer(record) : null
   }
 
   async join(data: JoinLobbyData): Promise<LobbyState> {
@@ -117,7 +98,7 @@ export class PrismaLobbyRepository implements ILobbyRepository {
       })
 
       const count = await tx.tournamentPlayer.count({
-        where: { tournamentId: data.tournamentId, role: { not: "HOST" } },
+        where: { tournamentId: data.tournamentId },
       })
 
       await tx.tournament.update({
@@ -149,7 +130,7 @@ export class PrismaLobbyRepository implements ILobbyRepository {
       })
 
       const count = await tx.tournamentPlayer.count({
-        where: { tournamentId, role: { not: "HOST" } },
+        where: { tournamentId },
       })
 
       await tx.tournament.update({
@@ -162,7 +143,9 @@ export class PrismaLobbyRepository implements ILobbyRepository {
   }
 
   async syncPlayerCount(tournamentId: string): Promise<number> {
-    const count = await countNonHostPlayers(tournamentId)
+    const count = await prisma.tournamentPlayer.count({
+      where: { tournamentId },
+    })
 
     await prisma.tournament.update({
       where: { id: tournamentId },
@@ -190,7 +173,7 @@ export class PrismaLobbyRepository implements ILobbyRepository {
   }
 
   async findTournamentForJoin(tournamentId: string) {
-    const tournament = await prisma.tournament.findUnique({
+    return prisma.tournament.findUnique({
       where: { id: tournamentId },
       select: {
         id: true,
@@ -201,11 +184,5 @@ export class PrismaLobbyRepository implements ILobbyRepository {
         hostId: true,
       },
     })
-
-    if (!tournament) return null
-
-    const playerCount = await countNonHostPlayers(tournamentId)
-
-    return { ...tournament, playerCount }
   }
 }

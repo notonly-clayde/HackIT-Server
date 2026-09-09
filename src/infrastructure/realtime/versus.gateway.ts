@@ -79,6 +79,10 @@ export function createVersusGateway(
   const notifyStarted = (event: VersusStartedEvent) => {
     if (!io) return
     io.to(`versus:${event.matchId}`).emit("versus:started", event)
+    // Also deliver per-user in case the client left the match room (e.g. after reconnect).
+    for (const playerId of [event.playerAId, event.playerBId]) {
+      emitToUser(playerId, "versus:started", event)
+    }
   }
 
   const notifyEnded = (event: VersusMatchEndedDto) => {
@@ -235,6 +239,7 @@ export function createVersusGateway(
               }
               emitToUser(playerId, "versus:match-found", toVersusMatchDto(created, playerId))
             }
+            scheduleLobbyStart(created.id, created.lobbyEndsAt)
             if (typeof ack === "function") ack({ ok: true, accepted: true })
             return
           }
@@ -379,6 +384,15 @@ export function createVersusGateway(
     }, TICK_MS)
   }
 
+  function scheduleLobbyStart(matchId: string, lobbyEndsAt: Date) {
+    const delay = Math.max(0, lobbyEndsAt.getTime() - Date.now())
+    setTimeout(() => {
+      void versusService.startLive(matchId).catch((error) => {
+        console.error(`[versus] scheduled start failed for match ${matchId}`, error)
+      })
+    }, delay)
+  }
+
   async function tryPairDifficulty(difficulty: ProblemDifficulty) {
     if (!io) return
 
@@ -409,6 +423,8 @@ export function createVersusGateway(
             io.to(socketId).emit("versus:match-found", dto)
           }
         }
+
+        scheduleLobbyStart(match.id, match.lobbyEndsAt)
       } catch (error) {
         // Re-queue both players if match creation failed
         const message = error instanceof Error ? error.message : "Failed to create match"
@@ -423,14 +439,21 @@ export function createVersusGateway(
     }
   }
 
+  let ticking = false
   async function tick() {
-    for (const difficulty of ["EASY", "MEDIUM", "HARD"] as ProblemDifficulty[]) {
-      await tryPairDifficulty(difficulty)
-    }
+    if (ticking) return
+    ticking = true
     try {
-      await versusService.tickActiveMatches()
-    } catch {
-      // ignore tick errors
+      for (const difficulty of ["EASY", "MEDIUM", "HARD"] as ProblemDifficulty[]) {
+        await tryPairDifficulty(difficulty)
+      }
+      try {
+        await versusService.tickActiveMatches()
+      } catch (error) {
+        console.error("[versus] tickActiveMatches failed", error)
+      }
+    } finally {
+      ticking = false
     }
   }
 
