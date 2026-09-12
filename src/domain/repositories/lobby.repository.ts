@@ -9,6 +9,10 @@ export type JoinLobbyData = {
 export interface ILobbyRepository {
   findLobbyState(tournamentId: string): Promise<LobbyState | null>
   findPlayer(tournamentId: string, userId: string): Promise<LobbyPlayer | null>
+  findParticipantRole(
+    tournamentId: string,
+    userId: string,
+  ): Promise<"HOST" | "MOD" | "PLAYER" | null>
   join(data: JoinLobbyData): Promise<LobbyState>
   leave(tournamentId: string, userId: string): Promise<LobbyState | null>
   syncPlayerCount(tournamentId: string): Promise<number>

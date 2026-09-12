@@ -78,6 +78,18 @@ export class PrismaLobbyRepository implements ILobbyRepository {
     return record ? toLobbyPlayer(record) : null
   }
 
+  async findParticipantRole(
+    tournamentId: string,
+    userId: string,
+  ): Promise<"HOST" | "MOD" | "PLAYER" | null> {
+    const record = await prisma.tournamentPlayer.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } },
+      select: { role: true },
+    })
+
+    return record?.role ?? null
+  }
+
   async join(data: JoinLobbyData): Promise<LobbyState> {
     await prisma.$transaction(async (tx) => {
       await tx.tournamentPlayer.upsert({
