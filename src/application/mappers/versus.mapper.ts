@@ -56,6 +56,9 @@ export function toVersusMatchDto(
 
   return {
     id: match.id,
+    kind: match.kind === "PRIVATE" ? "private" : "ranked",
+    lobbyName: match.lobbyName,
+    passwordProtected: Boolean(match.passwordHash),
     status: statusLabels[match.status],
     difficulty: difficultyLabels[match.difficulty],
     durationMinutes: match.durationMinutes,
@@ -66,7 +69,7 @@ export function toVersusMatchDto(
     endedReason: parseEndedReason(match.endedReason, match.status),
     youAre: match.playerAId === viewerId ? "a" : "b",
     playerA: toVersusPlayerCardDto(match.playerA),
-    playerB: toVersusPlayerCardDto(match.playerB),
+    playerB: match.playerB ? toVersusPlayerCardDto(match.playerB) : null,
     playerAEloBefore: match.playerAEloBefore,
     playerBEloBefore: match.playerBEloBefore,
     playerAEloAfter: match.playerAEloAfter,

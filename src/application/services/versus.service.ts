@@ -1,11 +1,24 @@
-import type { MatchWithPlayers, SubmissionVerdict } from "../../domain/entities/match.entity.js"
+import bcrypt from "bcryptjs"
+import {
+  isMatchReady,
+  type MatchWithPlayers,
+  type ReadyMatch,
+  type SubmissionVerdict,
+} from "../../domain/entities/match.entity.js"
 import type { ProblemDifficulty } from "../../domain/entities/problem.entity.js"
 import type { User } from "../../domain/entities/user.entity.js"
 import type { IMatchRepository } from "../../domain/repositories/match.repository.js"
 import type { IProblemRepository } from "../../domain/repositories/problem.repository.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
 import type { SubmitSolutionDto, SubmissionResultDto, RunSolutionResultDto } from "../dto/submission.dto.js"
-import type { VersusMatchDto, VersusMatchEndedDto, VersusReviewDto, VersusSubmissionResultDto } from "../dto/versus.dto.js"
+import type {
+  CreateVersusRoomDto,
+  JoinVersusRoomDto,
+  VersusMatchDto,
+  VersusMatchEndedDto,
+  VersusReviewDto,
+  VersusSubmissionResultDto,
+} from "../dto/versus.dto.js"
 import { toPlayerProblemDetailDto } from "../mappers/problem.mapper.js"
 import { toVersusMatchDto } from "../mappers/versus.mapper.js"
 import { CodeJudgeService } from "./code-judge.service.js"
@@ -15,8 +28,24 @@ import {
   MATCH_DURATION_BY_DIFFICULTY,
   MATCH_LOBBY_SECONDS,
 } from "../../shared/versus/elo.js"
-import { BadRequestError, ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js"
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../shared/errors/app-error.js"
 import type { VersusMatchNotifier } from "../../shared/realtime/versus-match-notifier.js"
+
+const BCRYPT_ROUNDS = 10
+
+const DIFFICULTY_BY_LABEL: Record<CreateVersusRoomDto["difficulty"], ProblemDifficulty> = {
+  easy: "EASY",
+  medium: "MEDIUM",
+  hard: "HARD",
+}
+
+/** Waiting private rooms must never be auto-promoted by the lobby timer; the real deadline is set on join. */
+const WAITING_ROOM_LOBBY_ENDS_AT = new Date("9999-12-31T00:00:00.000Z")
 
 export class VersusService {
   private readonly judge = new CodeJudgeService()
@@ -41,7 +70,7 @@ export class VersusService {
     playerAId: string,
     playerBId: string,
     difficulty: ProblemDifficulty,
-  ): Promise<MatchWithPlayers> {
+  ): Promise<ReadyMatch> {
     const [playerA, playerB] = await Promise.all([
       this.userRepository.findById(playerAId),
       this.userRepository.findById(playerBId),
@@ -70,7 +99,82 @@ export class VersusService {
       playerBEloBefore: playerB.elo1v1,
     })
 
+    if (!isMatchReady(match)) throw new Error("Created ranked match is missing player B")
     return match
+  }
+
+  async createPrivateRoom(hostId: string, input: CreateVersusRoomDto): Promise<VersusMatchDto> {
+    const host = await this.requireActiveUser(hostId)
+    const difficulty = DIFFICULTY_BY_LABEL[input.difficulty]
+
+    const problem = await this.pickRandomProblem(difficulty)
+    if (!problem) {
+      throw new BadRequestError(
+        `No public ${difficulty.toLowerCase()} problems with hidden tests are available yet`,
+      )
+    }
+
+    const match = await this.matchRepository.create({
+      kind: "PRIVATE",
+      lobbyName: input.lobbyName || null,
+      passwordHash: input.password ? await bcrypt.hash(input.password, BCRYPT_ROUNDS) : null,
+      playerAId: host.id,
+      playerBId: null,
+      problemId: problem.id,
+      difficulty,
+      durationMinutes: MATCH_DURATION_BY_DIFFICULTY[difficulty],
+      lobbyEndsAt: WAITING_ROOM_LOBBY_ENDS_AT,
+      playerAEloBefore: host.elo1v1,
+      playerBEloBefore: null,
+    })
+
+    return toVersusMatchDto(match, host.id)
+  }
+
+  async joinPrivateRoom(
+    matchId: string,
+    userId: string,
+    input: JoinVersusRoomDto,
+  ): Promise<VersusMatchDto> {
+    const guest = await this.requireActiveUser(userId)
+    const room = await this.matchRepository.findById(matchId)
+    if (!room || room.kind !== "PRIVATE") {
+      throw new NotFoundError("Room not found")
+    }
+    if (room.playerBId === userId) {
+      return toVersusMatchDto(room, userId)
+    }
+    if (room.playerAId === userId) {
+      throw new BadRequestError("You are the host of this room")
+    }
+    if (room.status !== "LOBBY") {
+      throw new BadRequestError("This room is no longer open")
+    }
+    if (room.playerBId) {
+      throw new BadRequestError("This room is full")
+    }
+    if (room.passwordHash) {
+      if (!input.password) {
+        throw new UnauthorizedError("This room requires a password")
+      }
+      const valid = await bcrypt.compare(input.password, room.passwordHash)
+      if (!valid) {
+        throw new UnauthorizedError("Incorrect room password")
+      }
+    }
+
+    const joined = await this.matchRepository.attachPlayerB(matchId, {
+      playerBId: guest.id,
+      playerAEloBefore: room.playerA.elo1v1,
+      playerBEloBefore: guest.elo1v1,
+      lobbyEndsAt: new Date(Date.now() + MATCH_LOBBY_SECONDS * 1000),
+    })
+    if (!joined || !isMatchReady(joined)) {
+      throw new BadRequestError("This room is no longer open")
+    }
+
+    this.matchNotifier.notifyLobbyReady(joined)
+    return toVersusMatchDto(joined, userId)
   }
 
   async getMatch(matchId: string, userId: string): Promise<VersusMatchDto> {
@@ -81,7 +185,7 @@ export class VersusService {
 
   async getReview(matchId: string, userId: string): Promise<VersusReviewDto> {
     const match = await this.requireParticipant(matchId, userId)
-    if (match.status !== "ENDED") {
+    if (match.status !== "ENDED" || !isMatchReady(match)) {
       throw new ForbiddenError("Match review is available after the match ends")
     }
 
@@ -115,7 +219,7 @@ export class VersusService {
   async startLive(matchId: string): Promise<MatchWithPlayers | null> {
     const startedAt = new Date()
     const match = await this.matchRepository.startLive(matchId, startedAt)
-    if (!match) return null
+    if (!match || !isMatchReady(match)) return null
 
     try {
       this.matchNotifier.notifyStarted({
@@ -142,7 +246,7 @@ export class VersusService {
       return this.toEndedDto(match, userId)
     }
 
-    if (match.status === "LOBBY") {
+    if (match.status === "LOBBY" || !isMatchReady(match)) {
       const aborted = await this.abortMatch(match)
       return this.toEndedDto(aborted, userId)
     }
@@ -234,7 +338,7 @@ export class VersusService {
     }
 
     for (const match of liveMatches) {
-      if (!match.startedAt) continue
+      if (!match.startedAt || !isMatchReady(match)) continue
       const endsAt = match.startedAt.getTime() + match.durationMinutes * 60_000
       if (endsAt <= now) {
         try {
@@ -250,7 +354,7 @@ export class VersusService {
     await this.recoverActiveMatches()
   }
 
-  private async timeoutMatch(match: MatchWithPlayers): Promise<void> {
+  private async timeoutMatch(match: ReadyMatch): Promise<void> {
     const hasAccepted = await this.matchRepository.hasAccepted(match.id)
     if (hasAccepted) return
     await this.settleMatch(match, null, "timeout")
@@ -284,6 +388,7 @@ export class VersusService {
     }
 
     for (const playerId of [settled.playerAId, settled.playerBId]) {
+      if (!playerId) continue
       const dto = await this.toEndedDto(settled, playerId)
       this.matchNotifier.notifyEnded(dto)
       this.matchNotifier.notifyState(dto.match)
@@ -293,7 +398,7 @@ export class VersusService {
   }
 
   private async settleMatch(
-    match: MatchWithPlayers,
+    match: ReadyMatch,
     winnerId: string | null,
     endedReason: "first_ac" | "timeout" | "forfeit" | "agreed_draw",
   ): Promise<MatchWithPlayers> {
@@ -331,7 +436,7 @@ export class VersusService {
       },
     )
 
-    if (!settled) {
+    if (!settled || !isMatchReady(settled)) {
       const fresh = await this.matchRepository.findById(match.id)
       if (!fresh) throw new NotFoundError("Match not found")
       return fresh
@@ -342,7 +447,7 @@ export class VersusService {
 
     const refreshed = (await this.matchRepository.findById(settled.id)) ?? settled
 
-    for (const playerId of [refreshed.playerAId, refreshed.playerBId]) {
+    for (const playerId of [settled.playerAId, settled.playerBId]) {
       const dto = await this.toEndedDto(refreshed, playerId)
       this.matchNotifier.notifyEnded(dto)
       this.matchNotifier.notifyState(dto.match)
@@ -371,8 +476,8 @@ export class VersusService {
     const solveElapsedMinutes = await this.resolveSolveMinutes(match)
     const matchDto = toVersusMatchDto(match, userId, { solveElapsedMinutes })
     const isA = match.playerAId === userId
-    const before = isA ? match.playerAEloBefore : match.playerBEloBefore
-    const after = isA ? (match.playerAEloAfter ?? before) : (match.playerBEloAfter ?? before)
+    const before = (isA ? match.playerAEloBefore : match.playerBEloBefore) ?? 0
+    const after = (isA ? match.playerAEloAfter : match.playerBEloAfter) ?? before
 
     if (match.status === "ABORTED") {
       return {
@@ -436,9 +541,16 @@ export class VersusService {
     return match
   }
 
-  private async requireLiveParticipant(matchId: string, userId: string): Promise<MatchWithPlayers> {
+  private async requireActiveUser(userId: string): Promise<User> {
+    const user = await this.userRepository.findById(userId)
+    if (!user) throw new NotFoundError("User not found")
+    if (user.status === "SUSPENDED") throw new ForbiddenError("Account suspended")
+    return user
+  }
+
+  private async requireLiveParticipant(matchId: string, userId: string): Promise<ReadyMatch> {
     const match = await this.requireParticipant(matchId, userId)
-    if (match.status === "LOBBY") {
+    if (match.status === "LOBBY" || !isMatchReady(match)) {
       throw new BadRequestError("Match has not started yet")
     }
     if (match.status === "ENDED" || match.status === "ABORTED") {

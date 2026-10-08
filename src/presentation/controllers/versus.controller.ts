@@ -1,6 +1,7 @@
 import type { Request, Response } from "express"
 import type { VersusService } from "../../application/services/versus.service.js"
 import { submitSolutionSchema } from "../../application/dto/submission.dto.js"
+import { createVersusRoomSchema, joinVersusRoomSchema } from "../../application/dto/versus.dto.js"
 import { BadRequestError, UnauthorizedError } from "../../shared/errors/app-error.js"
 
 export class VersusController {
@@ -41,6 +42,21 @@ export class VersusController {
     const matchId = this.requireId(req.params.id)
     const result = await this.versusService.leave(matchId, auth.userId)
     res.json(result)
+  }
+
+  createRoom = async (req: Request, res: Response) => {
+    const auth = this.requireAuth(req)
+    const body = createVersusRoomSchema.parse(req.body)
+    const match = await this.versusService.createPrivateRoom(auth.userId, body)
+    res.status(201).json(match)
+  }
+
+  joinRoom = async (req: Request, res: Response) => {
+    const auth = this.requireAuth(req)
+    const matchId = this.requireId(req.params.id)
+    const body = joinVersusRoomSchema.parse(req.body ?? {})
+    const match = await this.versusService.joinPrivateRoom(matchId, auth.userId, body)
+    res.json(match)
   }
 
   recoverActiveMatches = async () => {

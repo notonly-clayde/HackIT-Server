@@ -38,6 +38,14 @@ export type TournamentWithHost = Tournament & {
   passwordHash?: string | null
 }
 
+export type TournamentParticipation = {
+  id: string
+  name: string
+  type: BattleType
+  visibility: Visibility
+  endedAt: Date
+}
+
 export type TournamentFilters = {
   search?: string
   type?: "ffa" | "1v1"

@@ -23,7 +23,7 @@ function compareTournaments(a: TournamentWithHost, b: TournamentWithHost): numbe
   } else if (a.status === "ENDED") {
     timeDiff = compareDate(a.endedAt, b.endedAt, "desc")
   } else {
-    timeDiff = compareDate(a.scheduledAt, b.scheduledAt, "asc")
+    timeDiff = compareDate(a.createdAt, b.createdAt, "desc")
   }
 
   if (timeDiff !== 0) return timeDiff

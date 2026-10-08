@@ -5,6 +5,12 @@ import { asyncHandler } from "../middleware/error.middleware.js"
 export function createVersusRoutes(container: Container) {
   const router = Router()
 
+  router.post("/rooms", container.authMiddleware, asyncHandler(container.versusController.createRoom))
+  router.post(
+    "/rooms/:id/join",
+    container.authMiddleware,
+    asyncHandler(container.versusController.joinRoom),
+  )
   router.get("/matches/:id", container.authMiddleware, asyncHandler(container.versusController.getMatch))
   router.get(
     "/matches/:id/review",

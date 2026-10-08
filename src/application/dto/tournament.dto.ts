@@ -89,6 +89,7 @@ export type TournamentItemDto = {
   passwordProtected?: boolean
   moderators: TournamentModeratorDto[]
   scheduledAt: string
+  createdAt: string
   liveStartedAt?: string | null
   pausedAt?: string | null
   resumeAt?: string | null

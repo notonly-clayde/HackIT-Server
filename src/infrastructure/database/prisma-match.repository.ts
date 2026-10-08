@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client"
 import type {
+  AttachPlayerBData,
   CreateMatchData,
   CreateMatchSubmissionData,
   MatchHistoryRecord,
@@ -26,7 +27,7 @@ const matchInclude = {
 
 type MatchRecord = Prisma.MatchGetPayload<{ include: typeof matchInclude }>
 
-function toUser(record: MatchRecord["playerA"]): User {
+function toUser(record: NonNullable<MatchRecord["playerB"]>): User {
   return {
     id: record.id,
     email: record.email,
@@ -85,6 +86,9 @@ function toProblem(record: MatchRecord["problem"]): ProblemWithTests {
 function toMatch(record: MatchRecord): MatchWithPlayers {
   return {
     id: record.id,
+    kind: record.kind,
+    lobbyName: record.lobbyName,
+    passwordHash: record.passwordHash,
     playerAId: record.playerAId,
     playerBId: record.playerBId,
     problemId: record.problemId,
@@ -103,7 +107,7 @@ function toMatch(record: MatchRecord): MatchWithPlayers {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     playerA: toUser(record.playerA),
-    playerB: toUser(record.playerB),
+    playerB: record.playerB ? toUser(record.playerB) : null,
     problem: toProblem(record.problem),
   }
 }
@@ -112,6 +116,9 @@ export class PrismaMatchRepository implements IMatchRepository {
   async create(data: CreateMatchData): Promise<MatchWithPlayers> {
     const record = await prisma.match.create({
       data: {
+        kind: data.kind ?? "RANKED",
+        lobbyName: data.lobbyName ?? null,
+        passwordHash: data.passwordHash ?? null,
         playerAId: data.playerAId,
         playerBId: data.playerBId,
         problemId: data.problemId,
@@ -147,8 +154,22 @@ export class PrismaMatchRepository implements IMatchRepository {
 
   async startLive(id: string, startedAt: Date): Promise<MatchWithPlayers | null> {
     const updated = await prisma.match.updateMany({
-      where: { id, status: "LOBBY" },
+      where: { id, status: "LOBBY", playerBId: { not: null } },
       data: { status: "LIVE", startedAt },
+    })
+    if (updated.count === 0) return null
+    return this.findById(id)
+  }
+
+  async attachPlayerB(id: string, data: AttachPlayerBData): Promise<MatchWithPlayers | null> {
+    const updated = await prisma.match.updateMany({
+      where: { id, kind: "PRIVATE", status: "LOBBY", playerBId: null },
+      data: {
+        playerBId: data.playerBId,
+        playerAEloBefore: data.playerAEloBefore,
+        playerBEloBefore: data.playerBEloBefore,
+        lobbyEndsAt: data.lobbyEndsAt,
+      },
     })
     if (updated.count === 0) return null
     return this.findById(id)
@@ -261,6 +282,10 @@ export class PrismaMatchRepository implements IMatchRepository {
       },
     })
 
-    return records
+    return records.flatMap(({ playerB, playerBId, playerBEloBefore, ...rest }) =>
+      playerB && playerBId && playerBEloBefore !== null
+        ? [{ ...rest, playerB, playerBId, playerBEloBefore }]
+        : [],
+    )
   }
 }

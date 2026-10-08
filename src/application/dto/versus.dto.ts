@@ -6,6 +6,20 @@ export const versusDifficultySchema = z.enum(["easy", "medium", "hard"])
 
 export type VersusDifficultyDto = z.infer<typeof versusDifficultySchema>
 
+export const createVersusRoomSchema = z.object({
+  difficulty: versusDifficultySchema,
+  lobbyName: z.string().trim().max(60).optional(),
+  password: z.string().min(1).max(128).optional(),
+})
+
+export type CreateVersusRoomDto = z.infer<typeof createVersusRoomSchema>
+
+export const joinVersusRoomSchema = z.object({
+  password: z.string().max(128).optional(),
+})
+
+export type JoinVersusRoomDto = z.infer<typeof joinVersusRoomSchema>
+
 export type VersusEndedReason = "first_ac" | "timeout" | "forfeit" | "agreed_draw" | "abort"
 
 export type VersusPlayerCardDto = {
@@ -24,6 +38,9 @@ export type VersusPlayerCardDto = {
 
 export type VersusMatchDto = {
   id: string
+  kind: "ranked" | "private"
+  lobbyName: string | null
+  passwordProtected: boolean
   status: "lobby" | "live" | "ended" | "aborted"
   difficulty: VersusDifficultyDto
   durationMinutes: number
@@ -34,9 +51,10 @@ export type VersusMatchDto = {
   endedReason: VersusEndedReason | null
   youAre: "a" | "b"
   playerA: VersusPlayerCardDto
-  playerB: VersusPlayerCardDto
+  /** Null while a private room is waiting for its guest. */
+  playerB: VersusPlayerCardDto | null
   playerAEloBefore: number
-  playerBEloBefore: number
+  playerBEloBefore: number | null
   playerAEloAfter: number | null
   playerBEloAfter: number | null
   problem: ProblemDetailDto | null

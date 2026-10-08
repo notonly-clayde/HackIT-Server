@@ -74,3 +74,21 @@ export type MatchHistoryItemDto = {
   eloDelta: number
   opponent: MatchHistoryOpponentDto
 }
+
+export type ProfileHistoryKind = "all" | "versus" | "tournament"
+
+export type ProfileHistoryVersusItemDto = MatchHistoryItemDto & { kind: "versus" }
+
+export type ProfileHistoryTournamentItemDto = {
+  kind: "tournament"
+  tournamentId: string
+  name: string
+  tournamentType: "ffa" | "1v1"
+  endedAt: string
+  rank: number
+  rankTotal: number
+  solved: number
+  score: number
+}
+
+export type ProfileHistoryItemDto = ProfileHistoryVersusItemDto | ProfileHistoryTournamentItemDto

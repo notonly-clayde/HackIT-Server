@@ -28,26 +28,7 @@ export class StandingsService {
       }
     }
 
-    const lobby = await this.lobbyRepository.findLobbyState(tournamentId)
-    const players = (lobby?.players ?? []).filter((player) => player.role !== "host")
-
-    const problemEntries = await this.tournamentProblemRepository.findByTournamentId(tournamentId)
-    const problemPoints = Object.fromEntries(
-      problemEntries.map((entry) => [entry.problemId, entry.points]),
-    )
-
-    const submissions = await this.tournamentSubmissionRepository.findByTournamentId(tournamentId)
-
-    const computed = computeStandings(
-      players.map((player) => ({
-        userId: player.id,
-        displayName: player.displayName,
-      })),
-      problemPoints,
-      submissions,
-    )
-
-    const ranked = rankStandingsEntries(computed.entries)
+    const ranked = await this.getRankedStandings(tournamentId)
 
     return {
       tournamentId,
@@ -61,5 +42,28 @@ export class StandingsService {
         score: entry.score,
       })),
     }
+  }
+
+  async getRankedStandings(tournamentId: string) {
+    const [lobby, problemEntries, submissions] = await Promise.all([
+      this.lobbyRepository.findLobbyState(tournamentId),
+      this.tournamentProblemRepository.findByTournamentId(tournamentId),
+      this.tournamentSubmissionRepository.findByTournamentId(tournamentId),
+    ])
+    const players = (lobby?.players ?? []).filter((player) => player.role !== "host")
+    const problemPoints = Object.fromEntries(
+      problemEntries.map((entry) => [entry.problemId, entry.points]),
+    )
+
+    const computed = computeStandings(
+      players.map((player) => ({
+        userId: player.id,
+        displayName: player.displayName,
+      })),
+      problemPoints,
+      submissions,
+    )
+
+    return rankStandingsEntries(computed.entries)
   }
 }

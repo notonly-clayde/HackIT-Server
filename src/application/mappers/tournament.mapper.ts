@@ -51,6 +51,7 @@ export function toTournamentItemDto(
     hostId: tournament.hostId,
     moderators: tournament.moderators,
     scheduledAt: tournament.scheduledAt.toISOString(),
+    createdAt: tournament.createdAt.toISOString(),
     liveStartedAt: tournament.liveStartedAt?.toISOString() ?? null,
     pausedAt: tournament.pausedAt?.toISOString() ?? null,
     resumeAt: tournament.resumeAt?.toISOString() ?? null,

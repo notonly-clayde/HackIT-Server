@@ -1,4 +1,5 @@
 import type {
+  AttachPlayerBData,
   CreateMatchData,
   CreateMatchSubmissionData,
   MatchHistoryRecord,
@@ -11,7 +12,7 @@ import type {
 export type SettleMatchData = {
   winnerId: string | null
   playerAEloAfter: number
-  playerBEloAfter: number
+  playerBEloAfter: number | null
   endedAt: Date
   status?: "ENDED" | "ABORTED"
   endedReason?: string | null
@@ -22,6 +23,8 @@ export interface IMatchRepository {
   findById(id: string): Promise<MatchWithPlayers | null>
   findByStatus(status: MatchStatus): Promise<MatchWithPlayers[]>
   startLive(id: string, startedAt: Date): Promise<MatchWithPlayers | null>
+  /** Fills the empty seat of a waiting private room; null if the room is no longer open. */
+  attachPlayerB(id: string, data: AttachPlayerBData): Promise<MatchWithPlayers | null>
   settle(id: string, fromStatuses: MatchStatus[], data: SettleMatchData): Promise<MatchWithPlayers | null>
   createSubmission(data: CreateMatchSubmissionData): Promise<MatchSubmissionRecord>
   hasAccepted(matchId: string): Promise<boolean>

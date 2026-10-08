@@ -10,6 +10,7 @@ import type { JwtVerifier } from "../auth/jwt-verifier.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
 import { AppError } from "../../shared/errors/app-error.js"
 import type { ProblemDifficulty } from "../../domain/entities/problem.entity.js"
+import type { ReadyMatch } from "../../domain/entities/match.entity.js"
 
 const RECONNECT_GRACE_MS = 8000
 const TICK_MS = 1000
@@ -37,6 +38,7 @@ export type VersusGateway = {
   notifyState: (match: VersusMatchDto) => void
   notifyStarted: (event: VersusStartedEvent) => void
   notifyEnded: (event: VersusMatchEndedDto) => void
+  notifyLobbyReady: (match: ReadyMatch) => void
 }
 
 export function createVersusGateway(
@@ -63,12 +65,19 @@ export function createVersusGateway(
     }
   }
 
-  const opponentIdOf = (match: VersusMatchDto, userId: string) =>
-    match.playerA.id === userId ? match.playerB.id : match.playerA.id
+  const opponentIdOf = (match: VersusMatchDto, userId: string) => {
+    const opponentId = match.playerA.id === userId ? match.playerB?.id : match.playerA.id
+    if (!opponentId) throw new AppError("Opponent has not joined yet", 400)
+    return opponentId
+  }
+
+  const viewerIdOf = (match: VersusMatchDto) =>
+    match.youAre === "a" ? match.playerA.id : match.playerB?.id
 
   const notifyState = (match: VersusMatchDto) => {
     if (!io) return
-    const playerId = match.youAre === "a" ? match.playerA.id : match.playerB.id
+    const playerId = viewerIdOf(match)
+    if (!playerId) return
     const sockets = userSockets.get(playerId)
     if (!sockets) return
     for (const socketId of sockets) {
@@ -91,15 +100,36 @@ export function createVersusGateway(
     rematchOffers.delete(event.match.id)
     if (event.match.status === "ended") {
       const present = rematchPresent.get(event.match.id) ?? new Set<string>()
-      for (const playerId of [event.match.playerA.id, event.match.playerB.id]) {
-        if (userSockets.has(playerId)) present.add(playerId)
+      for (const playerId of [event.match.playerA.id, event.match.playerB?.id]) {
+        if (playerId && userSockets.has(playerId)) present.add(playerId)
       }
       rematchPresent.set(event.match.id, present)
     } else {
       rematchPresent.delete(event.match.id)
     }
-    const playerId = event.match.youAre === "a" ? event.match.playerA.id : event.match.playerB.id
-    emitToUser(playerId, "versus:ended", event)
+    const playerId = viewerIdOf(event.match)
+    if (playerId) emitToUser(playerId, "versus:ended", event)
+  }
+
+  const notifyLobbyReady = (match: ReadyMatch) => {
+    void (async () => {
+      if (io) {
+        const room = `versus:${match.id}`
+        for (const playerId of [match.playerAId, match.playerBId]) {
+          const sockets = userSockets.get(playerId)
+          if (!sockets) continue
+          for (const socketId of sockets) {
+            const sock = io.sockets.sockets.get(socketId)
+            if (sock) await sock.join(room)
+          }
+          emitToUser(playerId, "versus:match-found", toVersusMatchDto(match, playerId))
+          emitToUser(playerId, "versus:state", toVersusMatchDto(match, playerId))
+        }
+      }
+      scheduleLobbyStart(match.id, match.lobbyEndsAt)
+    })().catch((error) => {
+      console.error(`[versus] failed to announce lobby ${match.id}`, error)
+    })
   }
 
   const attach = (server: Server) => {
@@ -228,18 +258,12 @@ export function createVersusGateway(
             rematchPresent.delete(matchId)
             const difficulty = difficultyMap[match.difficulty]
             if (!difficulty) throw new AppError("Invalid difficulty", 400)
-            const created = await versusService.createLobbyMatch(match.playerA.id, match.playerB.id, difficulty)
-            const room = `versus:${created.id}`
-            for (const playerId of [created.playerAId, created.playerBId]) {
-              const sockets = userSockets.get(playerId)
-              if (!sockets || !io) continue
-              for (const socketId of sockets) {
-                const sock = io.sockets.sockets.get(socketId)
-                if (sock) await sock.join(room)
-              }
-              emitToUser(playerId, "versus:match-found", toVersusMatchDto(created, playerId))
-            }
-            scheduleLobbyStart(created.id, created.lobbyEndsAt)
+            const created = await versusService.createLobbyMatch(
+              match.playerA.id,
+              opponentIdOf(match, match.playerA.id),
+              difficulty,
+            )
+            notifyLobbyReady(created)
             if (typeof ack === "function") ack({ ok: true, accepted: true })
             return
           }
@@ -403,28 +427,7 @@ export function createVersusGateway(
 
       try {
         const match = await versusService.createLobbyMatch(pair.a.userId, pair.b.userId, difficulty)
-        const room = `versus:${match.id}`
-
-        for (const entry of [pair.a, pair.b]) {
-          const sockets = userSockets.get(entry.userId)
-          if (sockets) {
-            for (const socketId of sockets) {
-              const sock = io.sockets.sockets.get(socketId)
-              if (sock) await sock.join(room)
-            }
-          }
-        }
-
-        for (const entry of [pair.a, pair.b]) {
-          const dto = toVersusMatchDto(match, entry.userId)
-          const sockets = userSockets.get(entry.userId)
-          if (!sockets) continue
-          for (const socketId of sockets) {
-            io.to(socketId).emit("versus:match-found", dto)
-          }
-        }
-
-        scheduleLobbyStart(match.id, match.lobbyEndsAt)
+        notifyLobbyReady(match)
       } catch (error) {
         // Re-queue both players if match creation failed
         const message = error instanceof Error ? error.message : "Failed to create match"
@@ -465,5 +468,6 @@ export function createVersusGateway(
     notifyState,
     notifyStarted,
     notifyEnded,
+    notifyLobbyReady,
   }
 }

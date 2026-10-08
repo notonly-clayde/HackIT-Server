@@ -89,6 +89,7 @@ tournamentProblemSetNotifier.notify = gateway.notifyTournamentProblemSetUpdate
 versusMatchNotifier.notifyState = versusGateway.notifyState
 versusMatchNotifier.notifyStarted = versusGateway.notifyStarted
 versusMatchNotifier.notifyEnded = versusGateway.notifyEnded
+versusMatchNotifier.notifyLobbyReady = versusGateway.notifyLobbyReady
 
 
 

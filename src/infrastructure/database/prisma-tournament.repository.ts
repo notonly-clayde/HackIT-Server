@@ -3,6 +3,7 @@ import type {
   CreateTournamentData,
   TournamentFilters,
   TournamentModerator,
+  TournamentParticipation,
   TournamentStatus,
   TournamentWithHost,
   UpdateTournamentData,
@@ -207,5 +208,26 @@ export class PrismaTournamentRepository implements ITournamentRepository {
     })
 
     return record?.passwordHash ?? null
+  }
+
+  async findRecentEndedParticipationsByUserId(
+    userId: string,
+    limit: number,
+    options: { publicOnly: boolean },
+  ): Promise<TournamentParticipation[]> {
+    const records = await prisma.tournament.findMany({
+      where: {
+        status: "ENDED",
+        endedAt: { not: null },
+        liveStartedAt: { not: null },
+        ...(options.publicOnly ? { visibility: "PUBLIC" as const } : {}),
+        players: { some: { userId, role: { not: "HOST" } } },
+      },
+      orderBy: { endedAt: "desc" },
+      take: limit,
+      select: { id: true, name: true, type: true, visibility: true, endedAt: true },
+    })
+
+    return records.flatMap(({ endedAt, ...rest }) => (endedAt ? [{ ...rest, endedAt }] : []))
   }
 }

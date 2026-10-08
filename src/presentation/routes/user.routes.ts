@@ -17,6 +17,11 @@ export function createUserRoutes(container: Container) {
     container.authMiddleware,
     asyncHandler(container.userController.listMatches),
   )
+  router.get(
+    "/:id/history",
+    container.authMiddleware,
+    asyncHandler(container.userController.listHistory),
+  )
   router.get("/:id", container.authMiddleware, asyncHandler(container.userController.getPublic))
 
   return router
