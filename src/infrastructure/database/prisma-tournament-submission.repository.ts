@@ -1,4 +1,4 @@
-import type { SubmissionVerdict as PrismaSubmissionVerdict } from "@prisma/client"
+import type { SubmissionVerdict as PrismaSubmissionVerdict } from "../../generated/prisma/client.js"
 import type {
   CreateTournamentSubmissionData,
   SubmissionVerdict,

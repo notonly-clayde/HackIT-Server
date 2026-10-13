@@ -1,6 +1,6 @@
 import dns from "node:dns"
 import { PrismaPg } from "@prisma/adapter-pg"
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient } from "../../generated/prisma/client.js"
 
 dns.setDefaultResultOrder("ipv4first")
 

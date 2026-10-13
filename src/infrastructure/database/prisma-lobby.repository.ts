@@ -1,4 +1,4 @@
-import type { TournamentPlayerRole } from "@prisma/client"
+import type { TournamentPlayerRole } from "../../generated/prisma/client.js"
 import type { LobbyPlayer, LobbyState } from "../../domain/entities/lobby.entity.js"
 import type { ILobbyRepository, JoinLobbyData } from "../../domain/repositories/lobby.repository.js"
 import { prisma } from "./prisma.client.js"
