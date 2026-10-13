@@ -3,6 +3,7 @@ import type { SubmissionVerdict, TournamentSubmissionRecord } from "../../domain
 export type StandingsPlayer = {
   userId: string
   displayName: string
+  focusPointDeduction?: number
 }
 
 export type StandingsSubmission = Pick<
@@ -106,7 +107,7 @@ export function computeStandings(
       displayName: player.displayName,
       solved,
       penalty,
-      score,
+      score: Math.max(0, score - (player.focusPointDeduction ?? 0)),
       earliestAcceptedAt,
     }
   })

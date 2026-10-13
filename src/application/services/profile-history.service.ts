@@ -7,8 +7,10 @@ import type {
   ProfileHistoryTournamentItemDto,
   ProfileHistoryVersusItemDto,
 } from "../dto/user.dto.js"
+import type { TournamentItemDto } from "../dto/tournament.dto.js"
 import { toMatchHistoryItemDto } from "../mappers/versus.mapper.js"
-import { NotFoundError } from "../../shared/errors/app-error.js"
+import { toTournamentItemDto } from "../mappers/tournament.mapper.js"
+import { ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js"
 import type { StandingsService } from "./standings.service.js"
 
 const DEFAULT_HISTORY_LIMIT = 20
@@ -45,6 +47,23 @@ export class ProfileHistoryService {
     return [...versus, ...tournaments]
       .sort((a, b) => b.endedAt.localeCompare(a.endedAt))
       .slice(0, limit)
+  }
+
+  async listHostedTournaments(
+    userId: string,
+    viewerId: string,
+    rawLimit?: number,
+  ): Promise<TournamentItemDto[]> {
+    if (userId !== viewerId) {
+      throw new ForbiddenError("You can only view your own hosted tournaments")
+    }
+
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(MAX_HISTORY_LIMIT, Math.max(1, Math.floor(rawLimit!)))
+      : DEFAULT_HISTORY_LIMIT
+
+    const tournaments = await this.tournamentRepository.findByHostId(userId)
+    return tournaments.slice(0, limit).map((tournament) => toTournamentItemDto(tournament, "host"))
   }
 
   private async listVersus(userId: string, limit: number): Promise<ProfileHistoryVersusItemDto[]> {

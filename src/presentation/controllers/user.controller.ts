@@ -50,6 +50,15 @@ export class UserController {
     res.json(items)
   }
 
+  listHostedTournaments = async (req: Request, res: Response) => {
+    const id = req.params.id
+    if (!id || Array.isArray(id)) throw new BadRequestError("Invalid user id")
+    const rawLimit = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit
+    const limit = typeof rawLimit === "string" && rawLimit.trim() !== "" ? Number(rawLimit) : undefined
+    const items = await this.profileHistoryService.listHostedTournaments(id, req.auth!.userId, limit)
+    res.json(items)
+  }
+
   updateMe = async (req: Request, res: Response) => {
     const parsed = updateUserSchema.safeParse(req.body)
 

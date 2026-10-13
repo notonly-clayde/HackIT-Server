@@ -26,6 +26,8 @@ export interface IMatchRepository {
   /** Fills the empty seat of a waiting private room; null if the room is no longer open. */
   attachPlayerB(id: string, data: AttachPlayerBData): Promise<MatchWithPlayers | null>
   settle(id: string, fromStatuses: MatchStatus[], data: SettleMatchData): Promise<MatchWithPlayers | null>
+  /** Adds to a seat's focus ELO penalty while the match is live; returns the new total, or null if not live. */
+  addFocusEloPenalty(id: string, seat: "a" | "b", amount: number): Promise<number | null>
   createSubmission(data: CreateMatchSubmissionData): Promise<MatchSubmissionRecord>
   hasAccepted(matchId: string): Promise<boolean>
   findLatestSubmissions(matchId: string): Promise<MatchSubmissionRecord[]>

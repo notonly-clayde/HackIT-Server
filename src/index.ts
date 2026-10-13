@@ -67,6 +67,8 @@ const gateway = createLobbyGateway(
 
   container.tournamentRepository,
 
+  container.integrityService,
+
 )
 
 const versusGateway = createVersusGateway(
@@ -75,6 +77,7 @@ const versusGateway = createVersusGateway(
   container.jwtVerifier,
   container.userRepository,
   container.versusService,
+  container.integrityService,
 )
 
 versusGateway.attach(gateway.io)

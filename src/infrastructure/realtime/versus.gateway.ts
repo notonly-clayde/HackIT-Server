@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "node:http"
 import type { Server, Socket } from "socket.io"
 import type { Env } from "../../config/env.js"
 import type { VersusService } from "../../application/services/versus.service.js"
+import type { IntegrityService } from "../../application/services/integrity.service.js"
 import { VersusMatchmakingQueue } from "../../application/services/versus-matchmaking.queue.js"
 import { toVersusMatchDto } from "../../application/mappers/versus.mapper.js"
 import type { VersusMatchDto, VersusMatchEndedDto } from "../../application/dto/versus.dto.js"
@@ -47,6 +48,7 @@ export function createVersusGateway(
   jwtVerifier: JwtVerifier,
   userRepository: IUserRepository,
   versusService: VersusService,
+  integrityService: IntegrityService,
 ): VersusGateway {
   let io: Server | null = null
   const queue = new VersusMatchmakingQueue()
@@ -314,6 +316,27 @@ export function createVersusGateway(
           if (typeof ack === "function") ack({ ok: true })
         } catch (error) {
           const message = error instanceof Error ? error.message : "Failed to offer draw"
+          if (typeof ack === "function") ack({ ok: false, error: message })
+        }
+      })
+
+      authSocket.on("versus:integrity:focus-lost", async (payload, ack) => {
+        try {
+          const matchId =
+            payload && typeof payload === "object" && typeof payload.matchId === "string"
+              ? payload.matchId
+              : ""
+          if (!matchId) throw new AppError("Invalid match id", 400)
+
+          const { opponentId, ...result } = await integrityService.recordVersusFocusLoss(matchId, userId)
+          const event = { matchId, ...result }
+          if (result.applied) {
+            authSocket.emit("versus:integrity:applied", event)
+            emitToUser(opponentId, "versus:integrity-alert", event)
+          }
+          if (typeof ack === "function") ack({ ok: true, ...event })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to report focus loss"
           if (typeof ack === "function") ack({ ok: false, error: message })
         }
       })

@@ -253,8 +253,9 @@ model TournamentModerator {
 model TournamentPlayer {
   tournamentId String
   userId       String
-  role         TournamentPlayerRole @default(PLAYER)
-  joinedAt     DateTime             @default(now())
+  role                TournamentPlayerRole @default(PLAYER)
+  joinedAt            DateTime             @default(now())
+  focusPointDeduction Int                  @default(0)
   tournament   Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -379,6 +380,8 @@ model Match {
   playerAEloAfter  Int?
   playerBEloAfter  Int?
   endedReason      String?
+  playerAFocusEloPenalty Int       @default(0)
+  playerBFocusEloPenalty Int       @default(0)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 

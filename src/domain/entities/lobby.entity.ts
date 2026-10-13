@@ -7,6 +7,7 @@ export type LobbyPlayer = {
   eloTournament: number
   role: LobbyPlayerRole
   joinedAt: Date
+  focusPointDeduction: number
 }
 
 export type LobbyState = {

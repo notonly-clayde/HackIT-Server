@@ -59,6 +59,7 @@ export class StandingsService {
       players.map((player) => ({
         userId: player.id,
         displayName: player.displayName,
+        focusPointDeduction: player.focusPointDeduction,
       })),
       problemPoints,
       submissions,

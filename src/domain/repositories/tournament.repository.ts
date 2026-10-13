@@ -8,6 +8,7 @@ import type {
 
 export interface ITournamentRepository {
   findMany(filters: TournamentFilters): Promise<TournamentWithHost[]>
+  findByHostId(hostId: string): Promise<TournamentWithHost[]>
   findByIdWithHost(id: string): Promise<TournamentWithHost | null>
   create(data: CreateTournamentData): Promise<TournamentWithHost>
   update(id: string, data: UpdateTournamentData): Promise<TournamentWithHost>

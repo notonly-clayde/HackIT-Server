@@ -22,6 +22,11 @@ export function createUserRoutes(container: Container) {
     container.authMiddleware,
     asyncHandler(container.userController.listHistory),
   )
+  router.get(
+    "/:id/hosted-tournaments",
+    container.authMiddleware,
+    asyncHandler(container.userController.listHostedTournaments),
+  )
   router.get("/:id", container.authMiddleware, asyncHandler(container.userController.getPublic))
 
   return router

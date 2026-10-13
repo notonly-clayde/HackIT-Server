@@ -121,6 +121,15 @@ export class PrismaTournamentRepository implements ITournamentRepository {
     return sortTournaments(records.map((record) => toTournamentWithHost(record)))
   }
 
+  async findByHostId(hostId: string): Promise<TournamentWithHost[]> {
+    const records = await prisma.tournament.findMany({
+      where: { hostId },
+      include: hostInclude,
+    })
+
+    return sortTournaments(records.map((record) => toTournamentWithHost(record)))
+  }
+
   async findByIdWithHost(id: string): Promise<TournamentWithHost | null> {
     const record = await prisma.tournament.findUnique({
       where: { id },

@@ -22,6 +22,7 @@ import type { TournamentWorkspaceUpdateDto } from "../../shared/realtime/tournam
 import type { TournamentCatalogUpdateDto } from "../../shared/realtime/tournament-catalog-notifier.js"
 import type { TournamentProblemSetUpdateDto } from "../../shared/realtime/tournament-problem-set-notifier.js"
 import type { TournamentLiveService } from "../../application/services/tournament-live.service.js"
+import type { IntegrityService } from "../../application/services/integrity.service.js"
 import type { ITournamentRepository } from "../../domain/repositories/tournament.repository.js"
 
 
@@ -93,6 +94,8 @@ export function createLobbyGateway(
   tournamentLiveService: TournamentLiveService,
 
   tournamentRepository: ITournamentRepository,
+
+  integrityService: IntegrityService,
 
 ): LobbyGateway {
 
@@ -459,6 +462,54 @@ export function createLobbyGateway(
 
 
       authSocket.leave(`tournament-host:${tournamentId}`)
+
+    })
+
+
+
+    authSocket.on("tournament:integrity:focus-lost", async (payload, ack) => {
+
+      try {
+
+        const tournamentId =
+
+          payload && typeof payload.tournamentId === "string" ? payload.tournamentId.trim() : ""
+
+        if (!tournamentId) {
+
+          throw new AppError("Invalid tournament id", 400)
+
+        }
+
+        const result = await integrityService.recordTournamentFocusLoss(tournamentId, authSocket.data.userId)
+
+        const event = { tournamentId, ...result }
+
+        if (result.applied) {
+
+          authSocket.emit("tournament:integrity:applied", event)
+
+          io.to(`tournament-host:${tournamentId}`).emit("tournament:integrity-alert", event)
+
+        }
+
+        if (typeof ack === "function") {
+
+          ack({ ok: true, ...event })
+
+        }
+
+      } catch (error) {
+
+        const message = error instanceof Error ? error.message : "Failed to report focus loss"
+
+        if (typeof ack === "function") {
+
+          ack({ ok: false, error: message })
+
+        }
+
+      }
 
     })
 

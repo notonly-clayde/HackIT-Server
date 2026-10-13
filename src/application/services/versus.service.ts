@@ -24,6 +24,7 @@ import { toVersusMatchDto } from "../mappers/versus.mapper.js"
 import { CodeJudgeService } from "./code-judge.service.js"
 import {
   applyEloDelta,
+  ELO_FLOOR,
   ELO_K_BY_DIFFICULTY,
   MATCH_DURATION_BY_DIFFICULTY,
   MATCH_LOBBY_SECONDS,
@@ -420,8 +421,8 @@ export class VersusService {
       bScore = 1
     }
 
-    const aAfter = applyEloDelta(aBefore, bBefore, aScore, k)
-    const bAfter = applyEloDelta(bBefore, aBefore, bScore, k)
+    const aAfter = Math.max(ELO_FLOOR, applyEloDelta(aBefore, bBefore, aScore, k) - match.playerAFocusEloPenalty)
+    const bAfter = Math.max(ELO_FLOOR, applyEloDelta(bBefore, aBefore, bScore, k) - match.playerBFocusEloPenalty)
 
     const settled = await this.matchRepository.settle(
       match.id,

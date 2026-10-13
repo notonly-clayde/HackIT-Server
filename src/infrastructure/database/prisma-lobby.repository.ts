@@ -23,6 +23,7 @@ function toLobbyRole(role: TournamentPlayerRole): LobbyPlayer["role"] {
 function toLobbyPlayer(record: {
   role: TournamentPlayerRole
   joinedAt: Date
+  focusPointDeduction: number
   user: {
     id: string
     displayName: string
@@ -37,6 +38,7 @@ function toLobbyPlayer(record: {
     eloTournament: record.user.eloTournament,
     role: toLobbyRole(record.role),
     joinedAt: record.joinedAt,
+    focusPointDeduction: record.focusPointDeduction,
   }
 }
 
@@ -152,6 +154,16 @@ export class PrismaLobbyRepository implements ILobbyRepository {
     })
 
     return buildLobbyState(tournamentId)
+  }
+
+  async addFocusPointDeduction(tournamentId: string, userId: string, amount: number): Promise<number> {
+    const record = await prisma.tournamentPlayer.update({
+      where: { tournamentId_userId: { tournamentId, userId } },
+      data: { focusPointDeduction: { increment: amount } },
+      select: { focusPointDeduction: true },
+    })
+
+    return record.focusPointDeduction
   }
 
   async syncPlayerCount(tournamentId: string): Promise<number> {

@@ -29,6 +29,7 @@ import { StandingsService } from "../application/services/standings.service.js"
 import { WorkspaceService } from "../application/services/workspace.service.js"
 import { VersusService } from "../application/services/versus.service.js"
 import { ProfileHistoryService } from "../application/services/profile-history.service.js"
+import { IntegrityService } from "../application/services/integrity.service.js"
 
 import { AuthController } from "../presentation/controllers/auth.controller.js"
 import { UserController } from "../presentation/controllers/user.controller.js"
@@ -92,6 +93,7 @@ export type Container = {
   tournamentLiveService: TournamentLiveService
   tournamentRepository: PrismaTournamentRepository
   versusService: VersusService
+  integrityService: IntegrityService
 }
 
 export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
@@ -182,7 +184,14 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     userRepository,
     versusMatchNotifier,
   )
-
+  const integrityService = new IntegrityService(
+    tournamentLiveService,
+    lobbyRepository,
+    matchRepository,
+    standingsService,
+    tournamentStandingsNotifier,
+    activityLogService,
+  )
 
   return {
     authMiddleware: createAuthMiddleware(jwtVerifier, userRepository, env.ADMIN_EMAILS),
@@ -219,6 +228,7 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     tournamentLiveService,
     tournamentRepository,
     versusService,
+    integrityService,
   }
 }
 

@@ -34,6 +34,8 @@ export type MatchRecord = {
   playerAEloAfter: number | null
   playerBEloAfter: number | null
   endedReason: string | null
+  playerAFocusEloPenalty: number
+  playerBFocusEloPenalty: number
   createdAt: Date
   updatedAt: Date
 }

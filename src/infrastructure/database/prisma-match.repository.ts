@@ -104,6 +104,8 @@ function toMatch(record: MatchRecord): MatchWithPlayers {
     playerAEloAfter: record.playerAEloAfter,
     playerBEloAfter: record.playerBEloAfter,
     endedReason: record.endedReason,
+    playerAFocusEloPenalty: record.playerAFocusEloPenalty,
+    playerBFocusEloPenalty: record.playerBFocusEloPenalty,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     playerA: toUser(record.playerA),
@@ -193,6 +195,23 @@ export class PrismaMatchRepository implements IMatchRepository {
     })
     if (updated.count === 0) return null
     return this.findById(id)
+  }
+
+  async addFocusEloPenalty(id: string, seat: "a" | "b", amount: number): Promise<number | null> {
+    const updated = await prisma.match.updateMany({
+      where: { id, status: "LIVE" },
+      data:
+        seat === "a"
+          ? { playerAFocusEloPenalty: { increment: amount } }
+          : { playerBFocusEloPenalty: { increment: amount } },
+    })
+    if (updated.count === 0) return null
+    const record = await prisma.match.findUnique({
+      where: { id },
+      select: { playerAFocusEloPenalty: true, playerBFocusEloPenalty: true },
+    })
+    if (!record) return null
+    return seat === "a" ? record.playerAFocusEloPenalty : record.playerBFocusEloPenalty
   }
 
   async createSubmission(data: CreateMatchSubmissionData): Promise<MatchSubmissionRecord> {
