@@ -11,14 +11,20 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../../shared/errors/app-error.js"
+import { parseAdminEmails } from "../../shared/admin/admin-emails.js"
 import type { ActivityLogService } from "./activity-log.service.js"
 
 export class AdminUserService {
+  private readonly superAdminEmails: Set<string>
+
   constructor(
     private readonly userRepository: IUserRepository,
     private readonly reportRepository: IReportRepository,
     private readonly activityLogService: ActivityLogService,
-  ) {}
+    adminEmailsRaw: string,
+  ) {
+    this.superAdminEmails = parseAdminEmails(adminEmailsRaw)
+  }
 
   async list(query: AdminUserListQueryDto) {
     const status: UserStatus | undefined =
@@ -43,7 +49,7 @@ export class AdminUserService {
       this.userRepository.findLatestWarn(userId),
     ])
 
-    return { user, history, reports, activeWarn }
+    return { user, history, reports, activeWarn, isSuperAdmin: this.isSuperAdmin(user) }
   }
 
   async warn(actorId: string, subjectId: string, note: string) {
@@ -72,6 +78,7 @@ export class AdminUserService {
   async suspend(actorId: string, subjectId: string, reason: string) {
     const subject = await this.requireUser(subjectId)
     if (subject.id === actorId) throw new BadRequestError("You cannot suspend yourself")
+    if (this.isSuperAdmin(subject)) throw new ForbiddenError("Super admins cannot be suspended")
     if (subject.status === "SUSPENDED") throw new BadRequestError("User is already suspended")
 
     await this.userRepository.setSuspended(subjectId, reason)
@@ -129,6 +136,9 @@ export class AdminUserService {
       if (subjectId === actorId) {
         throw new ForbiddenError("You cannot demote yourself")
       }
+      if (this.isSuperAdmin(subject)) {
+        throw new ForbiddenError("Super admins cannot be demoted")
+      }
       const adminCount = await this.userRepository.countAdmins()
       if (adminCount <= 1) {
         throw new ForbiddenError("Cannot demote the last admin")
@@ -153,6 +163,10 @@ export class AdminUserService {
     })
 
     return this.getDetail(subjectId)
+  }
+
+  private isSuperAdmin(user: User): boolean {
+    return this.superAdminEmails.has(user.email.trim().toLowerCase())
   }
 
   private async requireUser(userId: string): Promise<User> {

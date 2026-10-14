@@ -125,7 +125,12 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     problemRepository,
     activityLogService,
   )
-  const adminUserService = new AdminUserService(userRepository, reportRepository, activityLogService)
+  const adminUserService = new AdminUserService(
+    userRepository,
+    reportRepository,
+    activityLogService,
+    env.ADMIN_EMAILS,
+  )
   const tournamentService = new TournamentService(tournamentRepository, userRepository, activityLogService)
   const lobbyService = new LobbyService(lobbyRepository, userRepository, activityLogService)
   const problemService = new ProblemService(problemRepository, userRepository, activityLogService)

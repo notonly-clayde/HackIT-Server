@@ -58,6 +58,15 @@ export class ReportController {
   }
 }
 
+function toAdminUserDetailResponse(detail: Awaited<ReturnType<AdminUserService["getDetail"]>>) {
+  return {
+    user: toUserResponseDto(detail.user, { activeWarn: detail.activeWarn }),
+    history: detail.history.map(toModerationActionResponseDto),
+    reports: detail.reports.map(toReportResponseDto),
+    isSuperAdmin: detail.isSuperAdmin,
+  }
+}
+
 export class AdminUserController {
   constructor(private readonly adminUserService: AdminUserService) {}
 
@@ -73,11 +82,7 @@ export class AdminUserController {
   getById = async (req: Request, res: Response) => {
     const id = this.requireId(req.params.id)
     const detail = await this.adminUserService.getDetail(id)
-    res.json({
-      user: toUserResponseDto(detail.user, { activeWarn: detail.activeWarn }),
-      history: detail.history.map(toModerationActionResponseDto),
-      reports: detail.reports.map(toReportResponseDto),
-    })
+    res.json(toAdminUserDetailResponse(detail))
   }
 
   warn = async (req: Request, res: Response) => {
@@ -87,11 +92,7 @@ export class AdminUserController {
       throw new BadRequestError(parsed.error.issues[0]?.message ?? "Invalid request body")
     }
     const detail = await this.adminUserService.warn(req.auth!.userId, id, parsed.data.note)
-    res.json({
-      user: toUserResponseDto(detail.user, { activeWarn: detail.activeWarn }),
-      history: detail.history.map(toModerationActionResponseDto),
-      reports: detail.reports.map(toReportResponseDto),
-    })
+    res.json(toAdminUserDetailResponse(detail))
   }
 
   suspend = async (req: Request, res: Response) => {
@@ -101,21 +102,13 @@ export class AdminUserController {
       throw new BadRequestError(parsed.error.issues[0]?.message ?? "Invalid request body")
     }
     const detail = await this.adminUserService.suspend(req.auth!.userId, id, parsed.data.reason)
-    res.json({
-      user: toUserResponseDto(detail.user, { activeWarn: detail.activeWarn }),
-      history: detail.history.map(toModerationActionResponseDto),
-      reports: detail.reports.map(toReportResponseDto),
-    })
+    res.json(toAdminUserDetailResponse(detail))
   }
 
   unsuspend = async (req: Request, res: Response) => {
     const id = this.requireId(req.params.id)
     const detail = await this.adminUserService.unsuspend(req.auth!.userId, id)
-    res.json({
-      user: toUserResponseDto(detail.user, { activeWarn: detail.activeWarn }),
-      history: detail.history.map(toModerationActionResponseDto),
-      reports: detail.reports.map(toReportResponseDto),
-    })
+    res.json(toAdminUserDetailResponse(detail))
   }
 
   setRole = async (req: Request, res: Response) => {
@@ -125,11 +118,7 @@ export class AdminUserController {
       throw new BadRequestError(parsed.error.issues[0]?.message ?? "Invalid request body")
     }
     const detail = await this.adminUserService.setRole(req.auth!.userId, id, parsed.data.role)
-    res.json({
-      user: toUserResponseDto(detail.user, { activeWarn: detail.activeWarn }),
-      history: detail.history.map(toModerationActionResponseDto),
-      reports: detail.reports.map(toReportResponseDto),
-    })
+    res.json(toAdminUserDetailResponse(detail))
   }
 
   private requireId(id: string | string[] | undefined): string {
