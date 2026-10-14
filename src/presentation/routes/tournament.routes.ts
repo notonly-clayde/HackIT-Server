@@ -40,6 +40,36 @@ export function createTournamentRoutes(container: Container) {
     container.optionalAuthMiddleware,
     asyncHandler(container.standingsController.getByTournamentId),
   )
+  router.get(
+    "/:id/discipline",
+    container.authMiddleware,
+    asyncHandler(container.tournamentDisciplineController.list),
+  )
+  router.post(
+    "/:id/players/:userId/warnings",
+    container.authMiddleware,
+    asyncHandler(container.tournamentDisciplineController.warn),
+  )
+  router.post(
+    "/:id/players/:userId/suspension-requests",
+    container.authMiddleware,
+    asyncHandler(container.tournamentDisciplineController.requestSuspension),
+  )
+  router.post(
+    "/:id/players/:userId/disqualify",
+    container.authMiddleware,
+    asyncHandler(container.tournamentDisciplineController.disqualify),
+  )
+  router.post(
+    "/:id/suspension-requests/:requestId/approve",
+    container.authMiddleware,
+    asyncHandler(container.tournamentDisciplineController.approve),
+  )
+  router.post(
+    "/:id/suspension-requests/:requestId/reject",
+    container.authMiddleware,
+    asyncHandler(container.tournamentDisciplineController.reject),
+  )
   router.use("/:id/problems", createTournamentProblemRoutes(container))
   router.use("/:id/workspace", createWorkspaceRoutes(container))
   router.use(createLobbyRoutes(container))

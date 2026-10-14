@@ -8,6 +8,8 @@ export type LobbyPlayer = {
   role: LobbyPlayerRole
   joinedAt: Date
   focusPointDeduction: number
+  disqualifiedAt: Date | null
+  disqualifyReason: string | null
 }
 
 export type LobbyState = {

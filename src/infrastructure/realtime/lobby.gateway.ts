@@ -21,6 +21,10 @@ import type { TournamentStandingsDto } from "../../shared/realtime/tournament-st
 import type { TournamentWorkspaceUpdateDto } from "../../shared/realtime/tournament-workspace-notifier.js"
 import type { TournamentCatalogUpdateDto } from "../../shared/realtime/tournament-catalog-notifier.js"
 import type { TournamentProblemSetUpdateDto } from "../../shared/realtime/tournament-problem-set-notifier.js"
+import type {
+  TournamentPlayerDisqualifiedDto,
+  TournamentPlayerWarnedDto,
+} from "../../shared/realtime/tournament-discipline-notifier.js"
 import type { TournamentLiveService } from "../../application/services/tournament-live.service.js"
 import type { IntegrityService } from "../../application/services/integrity.service.js"
 import type { ITournamentRepository } from "../../domain/repositories/tournament.repository.js"
@@ -74,6 +78,12 @@ export type LobbyGateway = {
   notifyTournamentCatalogUpdate: (update: TournamentCatalogUpdateDto) => void
 
   notifyTournamentProblemSetUpdate: (update: TournamentProblemSetUpdateDto) => void
+
+  notifyPlayerWarned: (event: TournamentPlayerWarnedDto) => void
+
+  notifyPlayerDisqualified: (event: TournamentPlayerDisqualifiedDto) => void
+
+  notifyDisciplineUpdated: (tournamentId: string) => void
 
 }
 
@@ -278,6 +288,8 @@ export function createLobbyGateway(
   io.on("connection", (socket) => {
 
     const authSocket = socket as AuthenticatedSocket
+
+    authSocket.join(`user:${authSocket.data.userId}`)
 
 
 
@@ -825,8 +837,23 @@ export function createLobbyGateway(
     io.to(`tournament:${update.tournamentId}`).emit("tournament:problem-set-update", update)
   }
 
+  function notifyPlayerWarned(event: TournamentPlayerWarnedDto) {
+    io.to(`user:${event.playerId}`).emit("tournament:player-warned", event)
+  }
+
+  function notifyPlayerDisqualified(event: TournamentPlayerDisqualifiedDto) {
+    io.to(`user:${event.playerId}`).emit("tournament:player-disqualified", event)
+  }
+
+  function notifyDisciplineUpdated(tournamentId: string) {
+    io.to(`tournament-host:${tournamentId}`).emit("tournament:discipline-update", { tournamentId })
+  }
+
   return {
     io,
+    notifyPlayerWarned,
+    notifyPlayerDisqualified,
+    notifyDisciplineUpdated,
     notifyTournamentLiveState,
     notifyTournamentStandings,
     notifyTournamentWorkspaceUpdate,

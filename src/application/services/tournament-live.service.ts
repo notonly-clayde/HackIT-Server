@@ -291,12 +291,29 @@ export class TournamentLiveService {
       throw new ForbiddenError("Tournament is paused")
     }
 
-    const role = await this.lobbyRepository.findParticipantRole(tournamentId, userId)
-    if (!role) {
-      throw new ForbiddenError("Only enrolled players can access the play arena. Spectate instead.")
-    }
+    await this.assertActivePlayer(tournamentId, userId)
 
     return tournament
+  }
+
+  async assertActivePlayer(tournamentId: string, userId: string) {
+    const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
+    if (!player || player.role !== "player") {
+      throw new ForbiddenError("Only enrolled players can access the play arena. Spectate instead.")
+    }
+    if (player.disqualifiedAt) {
+      throw new ForbiddenError("You have been disqualified from this tournament")
+    }
+    return player
+  }
+
+  async findDisqualification(
+    tournamentId: string,
+    userId: string,
+  ): Promise<{ at: Date; reason: string | null } | null> {
+    const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
+    if (!player?.disqualifiedAt) return null
+    return { at: player.disqualifiedAt, reason: player.disqualifyReason }
   }
 
   async resolveViewerRole(
@@ -305,11 +322,10 @@ export class TournamentLiveService {
   ): Promise<"host" | "player" | "mod" | null> {
     if (!userId) return null
     if (tournament.hostId === userId) return "host"
+    if (tournament.moderators.some((mod) => mod.id === userId)) return "mod"
 
     const role = await this.lobbyRepository.findParticipantRole(tournament.id, userId)
-    if (role === "MOD") return "mod"
-    if (role === "PLAYER") return "player"
-    return null
+    return role === "PLAYER" ? "player" : null
   }
 
   private async requireHost(tournamentId: string, hostId: string) {

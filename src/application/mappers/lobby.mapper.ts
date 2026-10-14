@@ -7,6 +7,7 @@ export type LobbyPlayerDto = {
   eloTournament: number
   role: "host" | "mod" | "player"
   joinedAt: string
+  disqualified: boolean
 }
 
 export type LobbyStateDto = {
@@ -24,6 +25,7 @@ export function toLobbyPlayerDto(player: LobbyPlayer): LobbyPlayerDto {
     eloTournament: player.eloTournament,
     role: player.role,
     joinedAt: player.joinedAt.toISOString(),
+    disqualified: player.disqualifiedAt !== null,
   }
 }
 

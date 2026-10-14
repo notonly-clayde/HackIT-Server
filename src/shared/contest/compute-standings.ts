@@ -4,6 +4,7 @@ export type StandingsPlayer = {
   userId: string
   displayName: string
   focusPointDeduction?: number
+  disqualified?: boolean
 }
 
 export type StandingsSubmission = Pick<
@@ -18,6 +19,7 @@ export type ComputedStandingsEntry = {
   penalty: number
   score: number
   earliestAcceptedAt: string | null
+  disqualified: boolean
 }
 
 export type ComputedStandings = {
@@ -109,10 +111,12 @@ export function computeStandings(
       penalty,
       score: Math.max(0, score - (player.focusPointDeduction ?? 0)),
       earliestAcceptedAt,
+      disqualified: player.disqualified ?? false,
     }
   })
 
   entries.sort((a, b) => {
+    if (a.disqualified !== b.disqualified) return a.disqualified ? 1 : -1
     if (b.score !== a.score) return b.score - a.score
     if (a.penalty !== b.penalty) return a.penalty - b.penalty
     if (a.earliestAcceptedAt && b.earliestAcceptedAt) {

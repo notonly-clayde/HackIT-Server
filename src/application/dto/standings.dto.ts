@@ -5,6 +5,7 @@ export type StandingsEntryDto = {
   solved: number
   penalty: number
   score: number
+  disqualified: boolean
 }
 
 export type TournamentStandingsDto = {

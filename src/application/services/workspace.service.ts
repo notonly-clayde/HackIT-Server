@@ -188,9 +188,12 @@ export class WorkspaceService {
       throw new ForbiddenError("Host cannot use the player workspace")
     }
 
-    const role = await this.lobbyRepository.findParticipantRole(tournamentId, userId)
-    if (!role) {
+    const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
+    if (!player || player.role !== "player") {
       throw new ForbiddenError("Only enrolled players can access the workspace")
+    }
+    if (player.disqualifiedAt) {
+      throw new ForbiddenError("You have been disqualified from this tournament")
     }
   }
 

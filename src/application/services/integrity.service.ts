@@ -46,7 +46,7 @@ export class IntegrityService {
     if (tournament.status !== "LIVE") throw new BadRequestError("Tournament is not live")
 
     const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
-    if (!player || player.role === "host") {
+    if (!player || player.role !== "player" || player.disqualifiedAt) {
       throw new ForbiddenError("Only enrolled players are monitored")
     }
 

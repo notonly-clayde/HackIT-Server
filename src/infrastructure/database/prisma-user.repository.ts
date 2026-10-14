@@ -132,6 +132,29 @@ export class PrismaUserRepository implements IUserRepository {
     return records.map(toUser)
   }
 
+  async findForModeratorLookup(query: string, excludeUserId: string, limit: number): Promise<User[]> {
+    const records = await prisma.user.findMany({
+      where: {
+        id: { not: excludeUserId },
+        status: "ACTIVE",
+        AND: [
+          { OR: [{ emailVerified: true }, { role: "ADMIN" }] },
+          {
+            OR: [
+              { email: { contains: query, mode: "insensitive" } },
+              { displayName: { contains: query, mode: "insensitive" } },
+              { name: { contains: query, mode: "insensitive" } },
+            ],
+          },
+        ],
+      },
+      orderBy: [{ displayName: "asc" }],
+      take: limit,
+    })
+
+    return records.map(toUser)
+  }
+
   async countAdmins(): Promise<number> {
     return prisma.user.count({ where: { role: "ADMIN" } })
   }

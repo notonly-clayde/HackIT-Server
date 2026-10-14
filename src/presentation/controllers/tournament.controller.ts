@@ -37,11 +37,19 @@ export class TournamentController {
       throw new NotFoundError("Tournament not found")
     }
 
-    const viewerRole = await this.tournamentLiveService.resolveViewerRole(
-      tournament,
-      req.auth?.userId ?? null,
-    )
-    res.json(toTournamentItemDto(tournament, viewerRole))
+    const viewerId = req.auth?.userId ?? null
+    const viewerRole = await this.tournamentLiveService.resolveViewerRole(tournament, viewerId)
+    const dto = toTournamentItemDto(tournament, viewerRole)
+
+    if (viewerRole === "player" && viewerId) {
+      const disqualification = await this.tournamentLiveService.findDisqualification(tournament.id, viewerId)
+      if (disqualification) {
+        dto.viewerDisqualified = true
+        dto.viewerDisqualifyReason = disqualification.reason
+      }
+    }
+
+    res.json(dto)
   }
 
   create = async (req: Request, res: Response) => {

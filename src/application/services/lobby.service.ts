@@ -68,6 +68,10 @@ export class LobbyService {
       throw new ForbiddenError("Host cannot join as a player")
     }
 
+    if (await this.lobbyRepository.isModerator(tournamentId, userId)) {
+      throw new ForbiddenError("Moderators monitor the tournament and cannot join as players")
+    }
+
     if (tournament.passwordProtected) {
       if (!password) {
         throw new UnauthorizedError("Tournament password required")
@@ -86,16 +90,10 @@ export class LobbyService {
       }
     }
 
-    let role: "MOD" | "PLAYER" = "PLAYER"
-
-    if (await this.lobbyRepository.isModerator(tournamentId, userId)) {
-      role = "MOD"
-    }
-
     const state = await this.lobbyRepository.join({
       tournamentId,
       userId,
-      role,
+      role: "PLAYER",
     })
 
     void this.activityLogService.record({
@@ -104,8 +102,8 @@ export class LobbyService {
       targetType: ACTIVITY_TARGET_TYPES.TOURNAMENT,
       targetId: tournamentId,
       tournamentId,
-      summary: `Joined tournament lobby as ${role}`,
-      metadata: { role },
+      summary: "Joined tournament lobby as PLAYER",
+      metadata: { role: "PLAYER" },
     })
 
     return state
@@ -122,10 +120,14 @@ export class LobbyService {
       throw new BadRequestError("Tournament is not live")
     }
 
-    const role = await this.lobbyRepository.findParticipantRole(tournamentId, userId)
+    const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
 
-    if (!role) {
+    if (!player || player.role !== "player") {
       throw new ForbiddenError("Only enrolled players can reconnect during a live tournament")
+    }
+
+    if (player.disqualifiedAt) {
+      throw new ForbiddenError("You have been disqualified from this tournament")
     }
 
     return this.getLobbyState(tournamentId)

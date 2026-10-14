@@ -11,6 +11,7 @@ import { PrismaTournamentProblemRepository } from "../infrastructure/database/pr
 import { PrismaTournamentSubmissionRepository } from "../infrastructure/database/prisma-tournament-submission.repository.js"
 import { PrismaTournamentWorkspaceRepository } from "../infrastructure/database/prisma-tournament-workspace.repository.js"
 import { PrismaMatchRepository } from "../infrastructure/database/prisma-match.repository.js"
+import { PrismaTournamentDisciplineRepository } from "../infrastructure/database/prisma-tournament-discipline.repository.js"
 
 import { JwtVerifier } from "../infrastructure/auth/jwt-verifier.js"
 
@@ -30,6 +31,7 @@ import { WorkspaceService } from "../application/services/workspace.service.js"
 import { VersusService } from "../application/services/versus.service.js"
 import { ProfileHistoryService } from "../application/services/profile-history.service.js"
 import { IntegrityService } from "../application/services/integrity.service.js"
+import { TournamentDisciplineService } from "../application/services/tournament-discipline.service.js"
 
 import { AuthController } from "../presentation/controllers/auth.controller.js"
 import { UserController } from "../presentation/controllers/user.controller.js"
@@ -45,6 +47,7 @@ import { HealthController } from "../presentation/controllers/health.controller.
 import { AdminUserController, ReportController } from "../presentation/controllers/moderation.controller.js"
 import { ActivityLogController } from "../presentation/controllers/activity-log.controller.js"
 import { VersusController } from "../presentation/controllers/versus.controller.js"
+import { TournamentDisciplineController } from "../presentation/controllers/tournament-discipline.controller.js"
 
 import { createAuthMiddleware } from "../presentation/middleware/auth.middleware.js"
 import { createOptionalAuthMiddleware } from "../presentation/middleware/optional-auth.middleware.js"
@@ -56,6 +59,10 @@ import { createTournamentWorkspaceNotifier, type TournamentWorkspaceNotifier } f
 import { createTournamentCatalogNotifier, type TournamentCatalogNotifier } from "../shared/realtime/tournament-catalog-notifier.js"
 import { createTournamentProblemSetNotifier, type TournamentProblemSetNotifier } from "../shared/realtime/tournament-problem-set-notifier.js"
 import { createVersusMatchNotifier, type VersusMatchNotifier } from "../shared/realtime/versus-match-notifier.js"
+import {
+  createTournamentDisciplineNotifier,
+  type TournamentDisciplineNotifier,
+} from "../shared/realtime/tournament-discipline-notifier.js"
 
 
 export type ContainerDeps = {
@@ -65,6 +72,7 @@ export type ContainerDeps = {
   tournamentCatalogNotifier?: TournamentCatalogNotifier
   tournamentProblemSetNotifier?: TournamentProblemSetNotifier
   versusMatchNotifier?: VersusMatchNotifier
+  tournamentDisciplineNotifier?: TournamentDisciplineNotifier
 }
 
 export type Container = {
@@ -86,6 +94,7 @@ export type Container = {
   standingsController: StandingsController
   workspaceController: WorkspaceController
   versusController: VersusController
+  tournamentDisciplineController: TournamentDisciplineController
   healthController: HealthController
   jwtVerifier: JwtVerifier
   userRepository: PrismaUserRepository
@@ -103,6 +112,8 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
   const tournamentCatalogNotifier = deps.tournamentCatalogNotifier ?? createTournamentCatalogNotifier()
   const tournamentProblemSetNotifier = deps.tournamentProblemSetNotifier ?? createTournamentProblemSetNotifier()
   const versusMatchNotifier = deps.versusMatchNotifier ?? createVersusMatchNotifier()
+  const tournamentDisciplineNotifier =
+    deps.tournamentDisciplineNotifier ?? createTournamentDisciplineNotifier()
 
   const userRepository = new PrismaUserRepository()
   const reportRepository = new PrismaReportRepository()
@@ -197,6 +208,16 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     tournamentStandingsNotifier,
     activityLogService,
   )
+  const tournamentDisciplineService = new TournamentDisciplineService(
+    tournamentLiveService,
+    lobbyRepository,
+    new PrismaTournamentDisciplineRepository(),
+    userRepository,
+    standingsService,
+    tournamentStandingsNotifier,
+    tournamentDisciplineNotifier,
+    activityLogService,
+  )
 
   return {
     authMiddleware: createAuthMiddleware(jwtVerifier, userRepository, env.ADMIN_EMAILS),
@@ -226,6 +247,7 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     standingsController: new StandingsController(standingsService, tournamentLiveService),
     workspaceController: new WorkspaceController(workspaceService),
     versusController: new VersusController(versusService),
+    tournamentDisciplineController: new TournamentDisciplineController(tournamentDisciplineService),
     healthController: new HealthController(),
     jwtVerifier,
     userRepository,

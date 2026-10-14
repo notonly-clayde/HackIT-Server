@@ -19,6 +19,8 @@ export interface IUserRepository {
   findById(id: string): Promise<User | null>
   findByEmails(emails: string[]): Promise<User[]>
   findManyAdmin(filters: AdminUserFilters): Promise<User[]>
+  /** Active, email-verified users matching email, display name, or name. */
+  findForModeratorLookup(query: string, excludeUserId: string, limit: number): Promise<User[]>
   countAdmins(): Promise<number>
   updateProfile(id: string, input: UpdateUserProfileInput): Promise<User>
   updateMatchStats(id: string, input: UpdateMatchStatsInput): Promise<User>

@@ -24,6 +24,8 @@ function toLobbyPlayer(record: {
   role: TournamentPlayerRole
   joinedAt: Date
   focusPointDeduction: number
+  disqualifiedAt: Date | null
+  disqualifyReason: string | null
   user: {
     id: string
     displayName: string
@@ -39,6 +41,8 @@ function toLobbyPlayer(record: {
     role: toLobbyRole(record.role),
     joinedAt: record.joinedAt,
     focusPointDeduction: record.focusPointDeduction,
+    disqualifiedAt: record.disqualifiedAt,
+    disqualifyReason: record.disqualifyReason,
   }
 }
 

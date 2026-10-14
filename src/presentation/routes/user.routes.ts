@@ -7,6 +7,7 @@ export function createUserRoutes(container: Container) {
 
   router.get("/me", container.authMiddleware, asyncHandler(container.userController.getMe))
   router.patch("/me", container.authMiddleware, asyncHandler(container.userController.updateMe))
+  router.get("/lookup", container.authMiddleware, asyncHandler(container.userController.lookup))
   router.post(
     "/me/warns/:id/acknowledge",
     container.authMiddleware,

@@ -1,7 +1,11 @@
 import type { Request, Response } from "express"
 import type { UserService } from "../../application/services/user.service.js"
 import type { ProfileHistoryService } from "../../application/services/profile-history.service.js"
-import { updateUserSchema } from "../../application/dto/user.dto.js"
+import {
+  updateUserSchema,
+  userLookupQuerySchema,
+  type UserLookupItemDto,
+} from "../../application/dto/user.dto.js"
 import {
   toModerationActionResponseDto,
   toPublicUserResponseDto,
@@ -18,6 +22,20 @@ export class UserController {
   getMe = async (req: Request, res: Response) => {
     const { user, activeWarn } = await this.userService.getMe(req.auth!.userId)
     res.json(toUserResponseDto(user, { activeWarn }))
+  }
+
+  lookup = async (req: Request, res: Response) => {
+    const parsed = userLookupQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      throw new BadRequestError(parsed.error.issues[0]?.message ?? "Invalid search query")
+    }
+    const users = await this.userService.lookupModeratorCandidates(req.auth!.userId, parsed.data.q)
+    const items: UserLookupItemDto[] = users.map((user) => ({
+      id: user.id,
+      displayName: user.displayName,
+      email: user.email,
+    }))
+    res.json(items)
   }
 
   getPublic = async (req: Request, res: Response) => {

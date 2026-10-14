@@ -79,6 +79,12 @@ enum TournamentPlayerRole {
   MOD
 }
 
+enum SuspensionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum ProblemDifficulty {
   EASY
   MEDIUM
@@ -151,6 +157,11 @@ model User {
   matchesAsPlayerB          Match[]                   @relation("MatchPlayerB")
   matchesWon                Match[]                   @relation("MatchWinner")
   matchSubmissions          MatchSubmission[]
+  tournamentWarningsReceived TournamentWarning[]          @relation("TournamentWarningPlayer")
+  tournamentWarningsIssued   TournamentWarning[]          @relation("TournamentWarningIssuer")
+  suspensionRequestsAgainst  TournamentSuspensionRequest[] @relation("SuspensionRequestPlayer")
+  suspensionRequestsMade     TournamentSuspensionRequest[] @relation("SuspensionRequestRequester")
+  suspensionRequestsDecided  TournamentSuspensionRequest[] @relation("SuspensionRequestDecider")
 }
 
 model Report {
@@ -239,6 +250,8 @@ model Tournament {
   submissions    TournamentSubmission[]
   playerSessions TournamentPlayerSession[]
   workspaces     TournamentWorkspace[]
+  warnings           TournamentWarning[]
+  suspensionRequests TournamentSuspensionRequest[]
 }
 
 model TournamentModerator {
@@ -256,10 +269,46 @@ model TournamentPlayer {
   role                TournamentPlayerRole @default(PLAYER)
   joinedAt            DateTime             @default(now())
   focusPointDeduction Int                  @default(0)
+  disqualifiedAt      DateTime?
+  disqualifyReason    String?
   tournament   Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([tournamentId, userId])
+}
+
+model TournamentWarning {
+  id           String     @id @default(cuid())
+  tournamentId String
+  playerId     String
+  issuedById   String
+  reason       String
+  createdAt    DateTime   @default(now())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player       User       @relation("TournamentWarningPlayer", fields: [playerId], references: [id], onDelete: Cascade)
+  issuedBy     User       @relation("TournamentWarningIssuer", fields: [issuedById], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId, createdAt])
+}
+
+model TournamentSuspensionRequest {
+  id            String                  @id @default(cuid())
+  tournamentId  String
+  playerId      String
+  requestedById String
+  reason        String
+  status        SuspensionRequestStatus @default(PENDING)
+  decidedById   String?
+  decisionNote  String?
+  decidedAt     DateTime?
+  createdAt     DateTime                @default(now())
+  tournament    Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player        User                    @relation("SuspensionRequestPlayer", fields: [playerId], references: [id], onDelete: Cascade)
+  requestedBy   User                    @relation("SuspensionRequestRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  decidedBy     User?                   @relation("SuspensionRequestDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId, createdAt])
+  @@index([tournamentId, playerId, status])
 }
 
 model Problem {

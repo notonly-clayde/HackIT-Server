@@ -40,6 +40,7 @@ export class StandingsService {
         solved: entry.solved,
         penalty: entry.penalty,
         score: entry.score,
+        disqualified: entry.disqualified,
       })),
     }
   }
@@ -50,7 +51,7 @@ export class StandingsService {
       this.tournamentProblemRepository.findByTournamentId(tournamentId),
       this.tournamentSubmissionRepository.findByTournamentId(tournamentId),
     ])
-    const players = (lobby?.players ?? []).filter((player) => player.role !== "host")
+    const players = (lobby?.players ?? []).filter((player) => player.role === "player")
     const problemPoints = Object.fromEntries(
       problemEntries.map((entry) => [entry.problemId, entry.points]),
     )
@@ -60,6 +61,7 @@ export class StandingsService {
         userId: player.id,
         displayName: player.displayName,
         focusPointDeduction: player.focusPointDeduction,
+        disqualified: player.disqualifiedAt !== null,
       })),
       problemPoints,
       submissions,

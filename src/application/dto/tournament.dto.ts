@@ -96,4 +96,6 @@ export type TournamentItemDto = {
   pausedTotalMs?: number
   endedAt?: string | null
   viewerRole?: "host" | "player" | "mod" | null
+  viewerDisqualified?: boolean
+  viewerDisqualifyReason?: string | null
 }

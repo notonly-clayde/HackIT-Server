@@ -5,13 +5,15 @@ import {
   ACTIVITY_ACTIONS,
   ACTIVITY_TARGET_TYPES,
 } from "../../domain/entities/activity-log.entity.js"
-import { NotFoundError } from "../../shared/errors/app-error.js"
+import { ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js"
+import { isUserEmailVerified } from "../../shared/auth/email-verified.js"
 import type { ActivityLogService } from "./activity-log.service.js"
 import { toMatchHistoryItemDto } from "../mappers/versus.mapper.js"
 import type { MatchHistoryItemDto } from "../dto/user.dto.js"
 
 const DEFAULT_MATCH_HISTORY_LIMIT = 20
 const MAX_MATCH_HISTORY_LIMIT = 50
+const USER_LOOKUP_LIMIT = 8
 
 export class UserService {
   constructor(
@@ -37,6 +39,17 @@ export class UserService {
       throw new NotFoundError("User not found")
     }
     return user
+  }
+
+  async lookupModeratorCandidates(actorId: string, query: string): Promise<User[]> {
+    const actor = await this.userRepository.findById(actorId)
+    if (!actor) {
+      throw new NotFoundError("User profile not found. Call /api/auth/bootstrap first.")
+    }
+    if (!isUserEmailVerified(actor)) {
+      throw new ForbiddenError("Verified email required")
+    }
+    return this.userRepository.findForModeratorLookup(query, actorId, USER_LOOKUP_LIMIT)
   }
 
   async updateMe(userId: string, input: UpdateUserProfileInput): Promise<User> {

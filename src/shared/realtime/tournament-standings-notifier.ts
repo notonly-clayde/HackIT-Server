@@ -8,6 +8,7 @@ export type TournamentStandingsDto = {
     solved: number
     penalty: number
     score: number
+    disqualified: boolean
   }[]
 }
 

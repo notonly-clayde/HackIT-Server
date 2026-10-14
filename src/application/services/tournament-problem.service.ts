@@ -45,12 +45,13 @@ export class TournamentProblemService {
     }
 
     const isHost = tournament.hostId === viewerId
-    const participantRole = isHost
+    const isMod = !isHost && tournament.moderators.some((mod) => mod.id === viewerId)
+    const participantRole = isHost || isMod
       ? null
       : await this.lobbyRepository.findParticipantRole(tournamentId, viewerId)
-    const isEnrolled = participantRole === "MOD" || participantRole === "PLAYER"
+    const isEnrolled = participantRole === "PLAYER"
 
-    if (!isHost && isEnrolled && tournament.status === "LIVE") {
+    if (isEnrolled && tournament.status === "LIVE") {
       await this.tournamentLiveService.assertPlayAccess(tournamentId, viewerId)
     }
 
@@ -67,9 +68,9 @@ export class TournamentProblemService {
       status: tournament.status,
       viewerRole: isHost
         ? ("host" as const)
-        : participantRole === "MOD"
+        : isMod
           ? ("mod" as const)
-          : participantRole === "PLAYER"
+          : isEnrolled
             ? ("player" as const)
             : null,
     }

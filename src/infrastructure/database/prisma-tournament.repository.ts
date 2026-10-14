@@ -172,6 +172,13 @@ export class PrismaTournamentRepository implements ITournamentRepository {
           await tx.tournamentModerator.createMany({
             data: data.moderatorIds.map((userId) => ({ tournamentId: id, userId })),
           })
+          const removed = await tx.tournamentPlayer.deleteMany({
+            where: { tournamentId: id, userId: { in: data.moderatorIds } },
+          })
+          if (removed.count > 0) {
+            const playerCount = await tx.tournamentPlayer.count({ where: { tournamentId: id } })
+            await tx.tournament.update({ where: { id }, data: { playerCount } })
+          }
         }
       }
 

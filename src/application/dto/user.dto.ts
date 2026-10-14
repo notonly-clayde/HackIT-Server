@@ -13,6 +13,16 @@ export const updateUserSchema = z
 
 export type UpdateUserDto = z.infer<typeof updateUserSchema>
 
+export const userLookupQuerySchema = z.object({
+  q: z.string().trim().min(2).max(100),
+})
+
+export type UserLookupItemDto = {
+  id: string
+  displayName: string
+  email: string
+}
+
 export type UserResponseDto = {
   id: string
   email: string
