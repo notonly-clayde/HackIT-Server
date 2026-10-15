@@ -34,7 +34,6 @@ export const createProblemSchema = z.object({
   memoryLimitMb: z.coerce.number().int().min(16).max(1024).optional().default(256),
   starterPython: z.string().max(10000).nullable().optional(),
   starterJs: z.string().max(10000).nullable().optional(),
-  starterCpp: z.string().max(10000).nullable().optional(),
   tags: tagsSchema,
   testCases: z.array(testCaseSchema).min(1),
 })
@@ -50,7 +49,6 @@ export const updateProblemSchema = z
     memoryLimitMb: z.coerce.number().int().min(16).max(1024).optional(),
     starterPython: z.string().max(10000).nullable().optional(),
     starterJs: z.string().max(10000).nullable().optional(),
-    starterCpp: z.string().max(10000).nullable().optional(),
     tags: tagsSchema.optional(),
     testCases: z.array(testCaseSchema).min(1).optional(),
   })
@@ -93,7 +91,6 @@ export type ProblemDetailDto = ProblemSummaryDto & {
   statement: string
   starterPython: string | null
   starterJs: string | null
-  starterCpp: string | null
   sampleTests: SampleTestCaseDto[]
   hiddenTests?: TestCaseDto[]
 }

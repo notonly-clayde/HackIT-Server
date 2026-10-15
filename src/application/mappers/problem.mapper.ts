@@ -64,7 +64,6 @@ export function toProblemDetailDto(
     statement: problem.statement,
     starterPython: problem.starterPython,
     starterJs: problem.starterJs,
-    starterCpp: problem.starterCpp,
     sampleTests,
     ...(options.includeHiddenTests
       ? { hiddenTests: problem.testCases.filter((t) => !t.isSample).map(toTestCaseDto) }

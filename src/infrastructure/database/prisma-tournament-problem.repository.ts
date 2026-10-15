@@ -26,7 +26,6 @@ function toEntry(record: {
     memoryLimitMb: number
     starterPython: string | null
     starterJs: string | null
-    starterCpp: string | null
     visibility: "PRIVATE" | "PENDING" | "PUBLIC"
     reviewNote: string | null
     tags: string[]
@@ -59,7 +58,6 @@ function toEntry(record: {
       memoryLimitMb: record.problem.memoryLimitMb,
       starterPython: record.problem.starterPython,
       starterJs: record.problem.starterJs,
-      starterCpp: record.problem.starterCpp,
       visibility: record.problem.visibility,
       reviewNote: record.problem.reviewNote,
       tags: record.problem.tags,

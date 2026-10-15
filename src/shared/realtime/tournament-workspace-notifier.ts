@@ -3,7 +3,7 @@ export type TournamentWorkspaceUpdateDto = {
   userId: string
   displayName: string
   activeProblemId: string | null
-  language: "python" | "javascript" | "cpp"
+  language: "python" | "javascript"
   problemId: string
   sourceCode: string
   updatedAt: string

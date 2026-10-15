@@ -4,14 +4,14 @@ export const saveMyWorkspaceSchema = z.object({
   problemId: z.string().min(1).optional(),
   sourceCode: z.string().max(50000).optional(),
   activeProblemId: z.string().min(1).nullable().optional(),
-  language: z.enum(["python", "javascript", "cpp", "js", "py", "c++"]).optional(),
+  language: z.enum(["python", "javascript", "js", "py"]).optional(),
 })
 
 export type SaveMyWorkspaceDto = z.infer<typeof saveMyWorkspaceSchema>
 
 export type TournamentPlayerSessionDto = {
   activeProblemId: string | null
-  language: "python" | "javascript" | "cpp"
+  language: "python" | "javascript"
   updatedAt: string
 }
 
@@ -40,7 +40,7 @@ export type TournamentWorkspaceUpdateDto = {
   userId: string
   displayName: string
   activeProblemId: string | null
-  language: "python" | "javascript" | "cpp"
+  language: "python" | "javascript"
   problemId: string
   sourceCode: string
   updatedAt: string

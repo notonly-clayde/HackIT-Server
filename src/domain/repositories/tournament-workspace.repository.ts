@@ -27,6 +27,5 @@ export function normalizeWorkspaceLanguage(language: string): WorkspaceLanguage 
   const normalized = language.toLowerCase()
   if (normalized === "js" || normalized === "javascript") return "javascript"
   if (normalized === "py" || normalized === "python") return "python"
-  if (normalized === "c++" || normalized === "cpp") return "cpp"
   return "python"
 }

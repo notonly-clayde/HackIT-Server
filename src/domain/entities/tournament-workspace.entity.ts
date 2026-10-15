@@ -1,4 +1,4 @@
-export type WorkspaceLanguage = "python" | "javascript" | "cpp"
+export type WorkspaceLanguage = "python" | "javascript"
 
 export type TournamentPlayerSessionRecord = {
   tournamentId: string

@@ -4,8 +4,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../src/generated/prisma/client.js"
-import { catalogProblems } from "../prisma/catalog/problems.js"
-import { defaultStarters, serializeCases } from "../prisma/catalog/types.js"
+import { catalogProblems } from "../prisma/catalog/problems/index.js"
+import { buildStarters, buildStatement, serializeCases } from "../prisma/catalog/types.js"
 import { normalizeProblemTags } from "../src/shared/problems/tags.js"
 
 dns.setDefaultResultOrder("ipv4first")
@@ -100,9 +100,11 @@ async function main() {
       }
 
       const testCases = [
-        ...serializeCases(problem.samples, problem.solve, true),
-        ...serializeCases(problem.hiddens, problem.solve, false),
+        ...serializeCases(problem.samples, problem, true),
+        ...serializeCases(problem.hiddens, problem, false),
       ]
+      const statement = buildStatement(problem)
+      const starters = buildStarters(problem.params)
 
       if (!testCases.some((t) => t.isSample) || !testCases.some((t) => !t.isSample)) {
         throw new Error(`Problem ${problem.seedKey} needs sample and hidden tests`)
@@ -121,13 +123,12 @@ async function main() {
             data: {
               authorId: author.id,
               title: problem.title,
-              statement: problem.statement,
+              statement,
               difficulty: problem.difficulty,
               timeLimitMs: problem.timeLimitMs ?? 2000,
               memoryLimitMb: problem.memoryLimitMb ?? 256,
-              starterPython: problem.starterPython ?? defaultStarters.python,
-              starterJs: problem.starterJs ?? defaultStarters.js,
-              starterCpp: null,
+              starterPython: starters.python,
+              starterJs: starters.js,
               visibility: "PUBLIC",
               reviewNote: null,
               tags,
@@ -143,13 +144,12 @@ async function main() {
             authorId: author.id,
             seedKey: problem.seedKey,
             title: problem.title,
-            statement: problem.statement,
+            statement,
             difficulty: problem.difficulty,
             timeLimitMs: problem.timeLimitMs ?? 2000,
             memoryLimitMb: problem.memoryLimitMb ?? 256,
-            starterPython: problem.starterPython ?? defaultStarters.python,
-            starterJs: problem.starterJs ?? defaultStarters.js,
-            starterCpp: null,
+            starterPython: starters.python,
+            starterJs: starters.js,
             visibility: "PUBLIC",
             reviewNote: null,
             tags,

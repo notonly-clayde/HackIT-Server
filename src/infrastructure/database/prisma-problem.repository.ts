@@ -36,7 +36,6 @@ function toProblemWithTests(record: ProblemRecord): ProblemWithTests {
     memoryLimitMb: record.memoryLimitMb,
     starterPython: record.starterPython,
     starterJs: record.starterJs,
-    starterCpp: record.starterCpp,
     visibility: record.visibility,
     reviewNote: record.reviewNote,
     tags: record.tags,
@@ -112,7 +111,6 @@ export class PrismaProblemRepository implements IProblemRepository {
         memoryLimitMb: data.memoryLimitMb,
         starterPython: data.starterPython ?? null,
         starterJs: data.starterJs ?? null,
-        starterCpp: data.starterCpp ?? null,
         tags: data.tags,
         visibility: "PRIVATE",
         testCases: {
@@ -146,7 +144,6 @@ export class PrismaProblemRepository implements IProblemRepository {
           ...(data.memoryLimitMb !== undefined ? { memoryLimitMb: data.memoryLimitMb } : {}),
           ...(data.starterPython !== undefined ? { starterPython: data.starterPython } : {}),
           ...(data.starterJs !== undefined ? { starterJs: data.starterJs } : {}),
-          ...(data.starterCpp !== undefined ? { starterCpp: data.starterCpp } : {}),
           ...(data.tags !== undefined ? { tags: data.tags } : {}),
           ...(data.testCases
             ? {

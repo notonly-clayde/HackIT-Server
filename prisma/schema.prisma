@@ -322,7 +322,6 @@ model Problem {
   memoryLimitMb Int               @default(256)
   starterPython String?
   starterJs     String?
-  starterCpp    String?
   visibility    ProblemVisibility @default(PRIVATE)
   reviewNote    String?
   tags          String[]          @default([])

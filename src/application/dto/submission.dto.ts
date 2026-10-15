@@ -2,7 +2,7 @@ import { z } from "zod"
 import type { TournamentStandingsDto } from "./standings.dto.js"
 
 export const submitSolutionSchema = z.object({
-  language: z.enum(["javascript", "python", "cpp", "js", "py", "c++"]),
+  language: z.enum(["javascript", "python", "js", "py"]),
   sourceCode: z.string().min(1).max(50000),
 })
 

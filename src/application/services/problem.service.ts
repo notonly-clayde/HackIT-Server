@@ -12,6 +12,7 @@ import {
 } from "../../shared/errors/app-error.js"
 import { difficultyMap } from "../../infrastructure/database/prisma-problem.repository.js"
 import { isUserEmailVerified } from "../../shared/auth/email-verified.js"
+import { parseTestLiteral } from "../../shared/judge/parse-test-value.js"
 import type { ActivityLogService } from "./activity-log.service.js"
 
 export class ProblemService {
@@ -51,7 +52,6 @@ export class ProblemService {
       memoryLimitMb: input.memoryLimitMb,
       starterPython: input.starterPython,
       starterJs: input.starterJs,
-      starterCpp: input.starterCpp,
       tags: input.tags,
       testCases: input.testCases.map((test, index) => ({
         input: test.input,
@@ -117,7 +117,6 @@ export class ProblemService {
       ...(input.memoryLimitMb !== undefined ? { memoryLimitMb: input.memoryLimitMb } : {}),
       ...(input.starterPython !== undefined ? { starterPython: input.starterPython } : {}),
       ...(input.starterJs !== undefined ? { starterJs: input.starterJs } : {}),
-      ...(input.starterCpp !== undefined ? { starterCpp: input.starterCpp } : {}),
       ...(input.tags !== undefined ? { tags: input.tags } : {}),
       ...(input.testCases
         ? {
@@ -254,7 +253,7 @@ export class ProblemService {
     }
   }
 
-  private validateTestCases(testCases: { isSample: boolean }[]) {
+  private validateTestCases(testCases: { input: string; expectedOutput: string; isSample: boolean }[]) {
     const hasSample = testCases.some((t) => t.isSample)
     const hasHidden = testCases.some((t) => !t.isSample)
 
@@ -264,6 +263,15 @@ export class ProblemService {
 
     if (!hasHidden) {
       throw new BadRequestError("At least one hidden test case is required")
+    }
+
+    for (const test of testCases) {
+      try {
+        parseTestLiteral(test.input)
+        parseTestLiteral(test.expectedOutput)
+      } catch (error) {
+        throw new BadRequestError(error instanceof Error ? error.message : "Invalid test case value")
+      }
     }
   }
 }

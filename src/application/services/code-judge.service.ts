@@ -2,9 +2,11 @@ import { spawn } from "node:child_process"
 import { mkdtemp, writeFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { pythonRuntime } from "../../infrastructure/judge/python-runtime.js"
 import { BadRequestError } from "../../shared/errors/app-error.js"
+import { parseTestValue, toSolveArgs } from "../../shared/judge/parse-test-value.js"
 
-export type JudgeLanguage = "javascript" | "python" | "cpp"
+export type JudgeLanguage = "javascript" | "python"
 
 export type JudgeTestCase = {
   input: string
@@ -28,30 +30,29 @@ export type JudgeVerdict = {
 const languageMap: Record<JudgeLanguage, string> = {
   javascript: "javascript",
   python: "python",
-  cpp: "cpp",
 }
 
 export function normalizeJudgeLanguage(language: string): JudgeLanguage {
   const normalized = language.toLowerCase()
   if (normalized === "js" || normalized === "javascript") return "javascript"
   if (normalized === "py" || normalized === "python") return "python"
-  if (normalized === "c++" || normalized === "cpp") return "cpp"
   throw new BadRequestError(`Unsupported language: ${language}`)
 }
 
+function toRunnerCases(testCases: JudgeTestCase[]) {
+  return testCases.map((test) => ({
+    args: toSolveArgs(test.input),
+    expected: parseTestValue(test.expectedOutput),
+  }))
+}
+
 function buildJavaScriptRunner(sourceCode: string, exportName: string, testCases: JudgeTestCase[]): string {
-  const casesJson = JSON.stringify(testCases)
+  const casesJson = JSON.stringify(toRunnerCases(testCases))
 
   return `${sourceCode}
 
 const __tests = ${casesJson};
 const __exportName = ${JSON.stringify(exportName)};
-
-function __parseTestValue(raw) {
-  const t = String(raw).trim();
-  if (!t) return raw;
-  try { return JSON.parse(t); } catch { return raw; }
-}
 
 function __formatTestValue(value) {
   if (typeof value === "string") return value.trim();
@@ -70,7 +71,7 @@ function __valuesEqual(actual, expected) {
 function __resolveSolve() {
   if (typeof globalThis[__exportName] === "function") return globalThis[__exportName];
   if (typeof ${exportName} === "function") return ${exportName};
-  throw new Error("Define ${exportName}(input) in your solution.");
+  throw new Error("Define ${exportName}(...) in your solution.");
 }
 
 const __solve = __resolveSolve();
@@ -79,21 +80,19 @@ const __results = [];
 for (let i = 0; i < __tests.length; i++) {
   const test = __tests[i];
   try {
-    const parsedInput = __parseTestValue(test.input);
-    const actual = __solve(parsedInput);
-    const expected = __parseTestValue(test.expectedOutput);
-    const passed = __valuesEqual(actual, expected);
+    const actual = __solve(...test.args);
+    const passed = __valuesEqual(actual, test.expected);
     __results.push({
       index: i + 1,
       passed,
-      expected: __formatTestValue(expected),
+      expected: __formatTestValue(test.expected),
       actual: __formatTestValue(actual),
     });
   } catch (error) {
     __results.push({
       index: i + 1,
       passed: false,
-      expected: __formatTestValue(__parseTestValue(test.expectedOutput)),
+      expected: __formatTestValue(test.expected),
       error: error instanceof Error ? error.message : String(error),
     });
     break;
@@ -105,48 +104,43 @@ console.log(JSON.stringify({ status: __results.every((item) => item.passed) ? "a
 }
 
 function buildPythonRunner(sourceCode: string, exportName: string, testCases: JudgeTestCase[]): string {
-  const casesJson = JSON.stringify(testCases)
+  const casesJson = JSON.stringify(toRunnerCases(testCases))
 
   return `${sourceCode}
 
 import json
 
-__tests = ${casesJson}
+__tests = json.loads(${JSON.stringify(casesJson)})
 __export_name = ${JSON.stringify(exportName)}
-
-def __parse_test_value(raw):
-    text = str(raw).strip()
-    if not text:
-        return raw
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return raw
 
 def __format_test_value(value):
     if isinstance(value, str):
         return value.strip()
     return json.dumps(value, separators=(",", ":"))
 
+def __is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
 def __values_equal(actual, expected):
-    if isinstance(actual, (dict, list)) or isinstance(expected, (dict, list)):
+    if isinstance(actual, (dict, list, tuple)) or isinstance(expected, (dict, list)):
         return json.dumps(actual, separators=(",", ":")) == json.dumps(expected, separators=(",", ":"))
+    if __is_number(actual) and __is_number(expected):
+        return actual == expected
     return str(actual).strip() == str(expected).strip()
 
 def __resolve_solve():
     fn = globals().get(__export_name)
     if callable(fn):
         return fn
-    raise RuntimeError(f"Define {exportName}(input) in your solution.")
+    raise RuntimeError(f"Define {__export_name}(...) in your solution.")
 
 __solve = __resolve_solve()
 __results = []
 
 for i, test in enumerate(__tests, start=1):
     try:
-        parsed_input = __parse_test_value(test["input"])
-        actual = __solve(parsed_input)
-        expected = __parse_test_value(test["expectedOutput"])
+        actual = __solve(*test["args"])
+        expected = test["expected"]
         passed = __values_equal(actual, expected)
         __results.append({
             "index": i,
@@ -158,7 +152,7 @@ for i, test in enumerate(__tests, start=1):
         __results.append({
             "index": i,
             "passed": False,
-            "expected": __format_test_value(__parse_test_value(test["expectedOutput"])),
+            "expected": __format_test_value(test["expected"]),
             "error": str(error),
         })
         break
@@ -178,10 +172,6 @@ function inferExportName(sourceCode: string, language: JudgeLanguage): string {
   if (language === "python") {
     const match = sourceCode.match(/^def\s+(\w+)\s*\(/m)
     if (match?.[1]) return match[1]
-  }
-  if (language === "cpp") {
-    const match = sourceCode.match(/(?:std::)?string\s+(\w+)\s*\(/)
-    if (match?.[1] && match[1] !== "main") return match[1]
   }
   return "solve"
 }
@@ -264,10 +254,6 @@ export class CodeJudgeService {
       throw new BadRequestError("No test cases to run")
     }
 
-    if (language === "cpp") {
-      return this.judgeCpp(sourceCode, testCases, timeLimitMs)
-    }
-
     if (language === "python") {
       return this.judgePython(sourceCode, testCases, timeLimitMs)
     }
@@ -314,136 +300,30 @@ export class CodeJudgeService {
   ): Promise<JudgeVerdict> {
     const exportName = inferExportName(sourceCode, "python")
     const runnerSource = buildPythonRunner(sourceCode, exportName, testCases)
-    const dir = await mkdtemp(join(tmpdir(), "hackit-judge-py-"))
-    const filePath = join(dir, "runner.py")
+    const result = await pythonRuntime.run(runnerSource, timeLimitMs + 500)
 
-    try {
-      await writeFile(filePath, runnerSource, "utf8")
-      const pythonCmd = process.platform === "win32" ? "python" : "python3"
-      const result = await runProcess(pythonCmd, [filePath], timeLimitMs + 500)
-
-      if (result.timedOut) {
-        return { status: "timeout", cases: [], message: "Execution timed out" }
-      }
-
-      if (result.exitCode !== 0 && !result.stdout.trim()) {
-        return {
-          status: "runtime_error",
-          cases: [],
-          message: result.stderr || "Python process failed",
-        }
-      }
-
-      return parseJudgeOutput(result.stdout, result.stderr)
-    } finally {
-      await rm(dir, { recursive: true, force: true })
+    if (result.timedOut) {
+      return { status: "timeout", cases: [], message: "Execution timed out" }
     }
-  }
 
-  private async judgeCpp(
-    sourceCode: string,
-    testCases: JudgeTestCase[],
-    timeLimitMs: number,
-  ): Promise<JudgeVerdict> {
-    const exportName = inferExportName(sourceCode, "cpp")
-
-    const runnerSource = `${sourceCode}
-
-#include <iostream>
-#include <string>
-#include <vector>
-
-std::string __trim(const std::string& value) {
-  size_t start = 0;
-  while (start < value.size() && (value[start] == ' ' || value[start] == '\\t' || value[start] == '\\r' || value[start] == '\\n')) start++;
-  size_t end = value.size();
-  while (end > start && (value[end - 1] == ' ' || value[end - 1] == '\\t' || value[end - 1] == '\\r' || value[end - 1] == '\\n')) end--;
-  return value.substr(start, end - start);
-}
-
-int main() {
-  std::vector<std::pair<std::string, std::string>> tests = {
-${testCases
-  .map(
-    (test) =>
-      `    {"${test.input.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}", "${test.expectedOutput.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"},`,
-  )
-  .join("\n")}
-  };
-
-  for (size_t i = 0; i < tests.size(); ++i) {
-    try {
-      std::string actual = __trim(${exportName}(tests[i].first));
-      std::string expected = __trim(tests[i].second);
-      if (actual != expected) {
-        std::cout << "{\\"status\\":\\"wrong_answer\\",\\"cases\\":[{\\"index\\":" << (i + 1)
-                  << ",\\"passed\\":false,\\"expected\\":\\"" << expected << "\\",\\"actual\\":\\"" << actual << "\\"}]}" << std::endl;
-        return 0;
-      }
-    } catch (...) {
-      std::cout << "{\\"status\\":\\"runtime_error\\",\\"cases\\":[{\\"index\\":" << (i + 1)
-                << ",\\"passed\\":false,\\"error\\":\\"runtime error\\"}]}" << std::endl;
-      return 0;
-    }
-  }
-
-  std::cout << "{\\"status\\":\\"accepted\\",\\"cases\\":[]}" << std::endl;
-  return 0;
-}
-`
-
-    const dir = await mkdtemp(join(tmpdir(), "hackit-judge-cpp-"))
-    const sourcePath = join(dir, "main.cpp")
-    const binaryPath = join(dir, process.platform === "win32" ? "main.exe" : "main")
-
-    try {
-      await writeFile(sourcePath, runnerSource, "utf8")
-      const compile = await runProcess("g++", ["-std=c++17", "-O2", sourcePath, "-o", binaryPath], 15000)
-
-      if (compile.exitCode !== 0) {
-        return {
-          status: "compile_error",
-          cases: [],
-          message: compile.stderr || "C++ compilation failed",
-        }
-      }
-
-      const result = await runProcess(binaryPath, [], timeLimitMs + 500)
-
-      if (result.timedOut) {
-        return { status: "timeout", cases: [], message: "Execution timed out" }
-      }
-
-      if (result.exitCode !== 0 && !result.stdout.trim()) {
-        return {
-          status: "runtime_error",
-          cases: [],
-          message: result.stderr || "C++ process failed",
-        }
-      }
-
-      const parsed = parseJudgeOutput(result.stdout, result.stderr)
-      if (parsed.status === "accepted" && parsed.cases.length === 0) {
-        return {
-          status: "accepted",
-          cases: testCases.map((test, index) => ({
-            index: index + 1,
-            passed: true,
-            expected: test.expectedOutput,
-          })),
-        }
-      }
-      return parsed
-    } catch {
+    if (result.error && !result.stdout.trim()) {
       return {
-        status: "unsupported",
+        status: "runtime_error",
         cases: [],
-        message: "C++ judge unavailable (g++ not found or failed)",
+        message: cleanPythonTraceback(result.error),
       }
-    } finally {
-      await rm(dir, { recursive: true, force: true })
     }
+
+    return parseJudgeOutput(result.stdout, result.stderr)
   }
+}
+
+function cleanPythonTraceback(message: string): string {
+  const lines = message.trimEnd().split("\n")
+  const userFrame = lines.findIndex((line) => line.includes('File "<exec>"'))
+  if (userFrame === -1) return message.trim()
+  return ["Traceback (most recent call last):", ...lines.slice(userFrame)].join("\n")
 }
 
 export { languageMap }
+

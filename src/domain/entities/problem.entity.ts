@@ -20,7 +20,6 @@ export type Problem = {
   memoryLimitMb: number
   starterPython: string | null
   starterJs: string | null
-  starterCpp: string | null
   visibility: ProblemVisibility
   reviewNote: string | null
   tags: string[]
@@ -54,7 +53,6 @@ export type CreateProblemData = {
   memoryLimitMb: number
   starterPython?: string | null
   starterJs?: string | null
-  starterCpp?: string | null
   tags: string[]
   testCases: {
     input: string
@@ -72,7 +70,6 @@ export type UpdateProblemData = {
   memoryLimitMb?: number
   starterPython?: string | null
   starterJs?: string | null
-  starterCpp?: string | null
   tags?: string[]
   testCases?: {
     input: string

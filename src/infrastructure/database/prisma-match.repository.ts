@@ -64,7 +64,6 @@ function toProblem(record: MatchRecord["problem"]): ProblemWithTests {
     memoryLimitMb: record.memoryLimitMb,
     starterPython: record.starterPython,
     starterJs: record.starterJs,
-    starterCpp: record.starterCpp,
     visibility: record.visibility,
     reviewNote: record.reviewNote,
     tags: record.tags,

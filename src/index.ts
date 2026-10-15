@@ -13,6 +13,7 @@ import { loadEnv } from "./config/env.js"
 import { createLobbyGateway } from "./infrastructure/realtime/lobby.gateway.js"
 
 import { createVersusGateway } from "./infrastructure/realtime/versus.gateway.js"
+import { pythonRuntime } from "./infrastructure/judge/python-runtime.js"
 
 import { createTournamentProblemSetNotifier } from "./shared/realtime/tournament-problem-set-notifier.js"
 import { createTournamentCatalogNotifier } from "./shared/realtime/tournament-catalog-notifier.js"
@@ -104,6 +105,7 @@ versusMatchNotifier.notifyLobbyReady = versusGateway.notifyLobbyReady
 
 void container.tournamentLiveController.recoverLiveTournaments()
 void container.versusController.recoverActiveMatches()
+void pythonRuntime.warm()
 
 
 
