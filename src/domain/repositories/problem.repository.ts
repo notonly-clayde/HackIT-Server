@@ -16,4 +16,5 @@ export interface IProblemRepository {
     visibility: ProblemVisibility,
     options?: { reviewNote?: string | null },
   ): Promise<ProblemWithTests>
+  delete(id: string): Promise<void>
 }

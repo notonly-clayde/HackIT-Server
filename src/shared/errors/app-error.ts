@@ -31,3 +31,21 @@ export class ForbiddenError extends AppError {
     super(message, 403)
   }
 }
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message = "Service unavailable") {
+    super(message, 503)
+  }
+}
+
+export class BadGatewayError extends AppError {
+  constructor(message = "Bad gateway") {
+    super(message, 502)
+  }
+}
+
+export class TooManyRequestsError extends AppError {
+  constructor(message = "Too many requests") {
+    super(message, 429)
+  }
+}

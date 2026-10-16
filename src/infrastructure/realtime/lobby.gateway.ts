@@ -28,6 +28,10 @@ import type {
 import type { TournamentLiveService } from "../../application/services/tournament-live.service.js"
 import type { IntegrityService } from "../../application/services/integrity.service.js"
 import type { ITournamentRepository } from "../../domain/repositories/tournament.repository.js"
+import type {
+  ModeratorInviteEventDto,
+  ModeratorInviteResolvedEventDto,
+} from "../../shared/realtime/moderator-invite-notifier.js"
 
 
 
@@ -84,6 +88,14 @@ export type LobbyGateway = {
   notifyPlayerDisqualified: (event: TournamentPlayerDisqualifiedDto) => void
 
   notifyDisciplineUpdated: (tournamentId: string) => void
+
+  notifyModeratorInvite: (userId: string, event: ModeratorInviteEventDto) => void
+
+  notifyModeratorInviteResolved: (
+    hostId: string,
+    inviteeUserId: string,
+    event: ModeratorInviteResolvedEventDto,
+  ) => void
 
 }
 
@@ -849,11 +861,26 @@ export function createLobbyGateway(
     io.to(`tournament-host:${tournamentId}`).emit("tournament:discipline-update", { tournamentId })
   }
 
+  function notifyModeratorInvite(userId: string, event: ModeratorInviteEventDto) {
+    io.to(`user:${userId}`).emit("moderator:invite", event)
+  }
+
+  function notifyModeratorInviteResolved(
+    hostId: string,
+    inviteeUserId: string,
+    event: ModeratorInviteResolvedEventDto,
+  ) {
+    io.to(`user:${hostId}`).emit("moderator:invite-resolved", event)
+    io.to(`user:${inviteeUserId}`).emit("moderator:invite-resolved", event)
+  }
+
   return {
     io,
     notifyPlayerWarned,
     notifyPlayerDisqualified,
     notifyDisciplineUpdated,
+    notifyModeratorInvite,
+    notifyModeratorInviteResolved,
     notifyTournamentLiveState,
     notifyTournamentStandings,
     notifyTournamentWorkspaceUpdate,

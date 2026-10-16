@@ -84,6 +84,12 @@ export class PrismaTournamentDisciplineRepository implements ITournamentDiscipli
     return records.map(toWarning)
   }
 
+  async countWarnings(tournamentId: string, playerId: string): Promise<number> {
+    return prisma.tournamentWarning.count({
+      where: { tournamentId, playerId },
+    })
+  }
+
   async listSuspensionRequests(tournamentId: string): Promise<TournamentSuspensionRequestRecord[]> {
     const records = await prisma.tournamentSuspensionRequest.findMany({
       where: { tournamentId },

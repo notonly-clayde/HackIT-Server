@@ -213,6 +213,43 @@ export class ProblemService {
     return updated
   }
 
+  async delete(id: string, userId: string, emailVerified: boolean) {
+    await this.requireVerified(userId)
+
+    const problem = await this.problemRepository.findById(id)
+    if (!problem) {
+      throw new NotFoundError("Problem not found")
+    }
+
+    if (problem.authorId !== userId) {
+      throw new ForbiddenError("Only the author can delete this problem")
+    }
+
+    if (problem.visibility === "PUBLIC") {
+      throw new ForbiddenError("Public problems cannot be deleted. Ask an admin to unpublish first.")
+    }
+
+    void this.activityLogService.record({
+      action: ACTIVITY_ACTIONS.PROBLEM_DELETED,
+      actorId: userId,
+      targetType: ACTIVITY_TARGET_TYPES.PROBLEM,
+      targetId: id,
+      summary: `Problem deleted: ${problem.title}`,
+    })
+
+    try {
+      await this.problemRepository.delete(id)
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : ""
+      if (code === "P2003") {
+        throw new BadRequestError(
+          "This problem is linked to versus match history and cannot be deleted.",
+        )
+      }
+      throw error
+    }
+  }
+
   async unpublish(id: string, actorId: string) {
     const problem = await this.problemRepository.findById(id)
     if (!problem) {

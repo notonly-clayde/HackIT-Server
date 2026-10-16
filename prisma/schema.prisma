@@ -162,6 +162,13 @@ model User {
   suspensionRequestsAgainst  TournamentSuspensionRequest[] @relation("SuspensionRequestPlayer")
   suspensionRequestsMade     TournamentSuspensionRequest[] @relation("SuspensionRequestRequester")
   suspensionRequestsDecided  TournamentSuspensionRequest[] @relation("SuspensionRequestDecider")
+  moderatorInvitesReceived   TournamentModeratorInvite[]   @relation("ModeratorInviteInvitee")
+  moderatorInvitesSent       TournamentModeratorInvite[]   @relation("ModeratorInviteInviter")
+}
+
+enum ModeratorInviteStatus {
+  PENDING
+  DECLINED
 }
 
 model Report {
@@ -252,6 +259,24 @@ model Tournament {
   workspaces     TournamentWorkspace[]
   warnings           TournamentWarning[]
   suspensionRequests TournamentSuspensionRequest[]
+  moderatorInvites TournamentModeratorInvite[]
+}
+
+model TournamentModeratorInvite {
+  id           String                @id @default(cuid())
+  tournamentId String
+  userId       String
+  invitedById  String
+  status       ModeratorInviteStatus @default(PENDING)
+  createdAt    DateTime              @default(now())
+  respondedAt  DateTime?
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation("ModeratorInviteInvitee", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy  User       @relation("ModeratorInviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([userId, status])
 }
 
 model TournamentModerator {
@@ -271,6 +296,7 @@ model TournamentPlayer {
   focusPointDeduction Int                  @default(0)
   disqualifiedAt      DateTime?
   disqualifyReason    String?
+  finishedAt          DateTime?
   tournament   Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -4,6 +4,7 @@ import {
   disciplineDecisionSchema,
   disciplineReasonSchema,
   type TournamentDisciplineDto,
+  type WarnPlayerResultDto,
 } from "../../application/dto/tournament-discipline.dto.js"
 import {
   toTournamentSuspensionRequestDto,
@@ -34,7 +35,13 @@ export class TournamentDisciplineController {
       this.requireParam(req.params.userId),
       reason,
     )
-    res.status(201).json(toTournamentWarningDto(warning))
+    const body: WarnPlayerResultDto = {
+      ...toTournamentWarningDto(warning),
+      playerWarningCount: warning.playerWarningCount,
+      maxWarnings: warning.maxWarnings,
+      disqualified: warning.disqualified,
+    }
+    res.status(201).json(body)
   }
 
   requestSuspension = async (req: Request, res: Response) => {

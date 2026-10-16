@@ -23,6 +23,7 @@ import {
 } from "../../shared/errors/app-error.js"
 import { isUserEmailVerified } from "../../shared/auth/email-verified.js"
 import type { ActivityLogService } from "./activity-log.service.js"
+import type { TournamentModeratorInviteService } from "./tournament-moderator-invite.service.js"
 
 const BCRYPT_ROUNDS = 10
 
@@ -31,6 +32,7 @@ export class TournamentService {
     private readonly tournamentRepository: ITournamentRepository,
     private readonly userRepository: IUserRepository,
     private readonly activityLogService: ActivityLogService,
+    private readonly moderatorInviteService: TournamentModeratorInviteService,
   ) {}
 
   async list(filters: TournamentFilters): Promise<TournamentWithHost[]> {
@@ -73,8 +75,10 @@ export class TournamentService {
       passwordProtected: Boolean(passwordHash),
       passwordHash,
       hostId,
-      moderatorIds,
+      moderatorIds: [],
     })
+
+    await this.moderatorInviteService.syncModerators(tournament.id, hostId, moderatorIds)
 
     void this.activityLogService.record({
       action: ACTIVITY_ACTIONS.TOURNAMENT_CREATED,
@@ -85,7 +89,7 @@ export class TournamentService {
       summary: `Tournament created: ${tournament.name}`,
     })
 
-    return tournament
+    return this.getById(tournament.id)
   }
 
   async update(
@@ -131,11 +135,16 @@ export class TournamentService {
       }
     }
 
+    let moderatorIdsToSync: string[] | undefined
     if (input.moderatorEmails !== undefined) {
-      data.moderatorIds = await this.resolveModeratorIds(input.moderatorEmails, actorId)
+      moderatorIdsToSync = await this.resolveModeratorIds(input.moderatorEmails, actorId)
     }
 
     const updated = await this.tournamentRepository.update(id, data)
+
+    if (moderatorIdsToSync !== undefined) {
+      await this.moderatorInviteService.syncModerators(id, actorId, moderatorIdsToSync)
+    }
 
     void this.activityLogService.record({
       action: ACTIVITY_ACTIONS.TOURNAMENT_UPDATED,
@@ -146,7 +155,7 @@ export class TournamentService {
       summary: `Tournament updated: ${updated.name}`,
     })
 
-    return updated
+    return this.getById(id)
   }
 
   async delete(id: string, actorId: string, _emailVerified: boolean): Promise<void> {

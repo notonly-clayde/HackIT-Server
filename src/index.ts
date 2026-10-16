@@ -22,6 +22,7 @@ import { createTournamentStandingsNotifier } from "./shared/realtime/tournament-
 import { createTournamentWorkspaceNotifier } from "./shared/realtime/tournament-workspace-notifier.js"
 import { createVersusMatchNotifier } from "./shared/realtime/versus-match-notifier.js"
 import { createTournamentDisciplineNotifier } from "./shared/realtime/tournament-discipline-notifier.js"
+import { createModeratorInviteNotifier } from "./shared/realtime/moderator-invite-notifier.js"
 
 
 
@@ -38,9 +39,11 @@ const tournamentCatalogNotifier = createTournamentCatalogNotifier()
 const tournamentProblemSetNotifier = createTournamentProblemSetNotifier()
 const versusMatchNotifier = createVersusMatchNotifier()
 const tournamentDisciplineNotifier = createTournamentDisciplineNotifier()
+const moderatorInviteNotifier = createModeratorInviteNotifier()
 
 const container = createContainer(env, {
   tournamentDisciplineNotifier,
+  moderatorInviteNotifier,
   tournamentLiveStateNotifier,
   tournamentStandingsNotifier,
   tournamentWorkspaceNotifier,
@@ -96,6 +99,8 @@ tournamentProblemSetNotifier.notify = gateway.notifyTournamentProblemSetUpdate
 tournamentDisciplineNotifier.notifyWarned = gateway.notifyPlayerWarned
 tournamentDisciplineNotifier.notifyDisqualified = gateway.notifyPlayerDisqualified
 tournamentDisciplineNotifier.notifyUpdated = gateway.notifyDisciplineUpdated
+moderatorInviteNotifier.notifyInvite = gateway.notifyModeratorInvite
+moderatorInviteNotifier.notifyResolved = gateway.notifyModeratorInviteResolved
 versusMatchNotifier.notifyState = versusGateway.notifyState
 versusMatchNotifier.notifyStarted = versusGateway.notifyStarted
 versusMatchNotifier.notifyEnded = versusGateway.notifyEnded

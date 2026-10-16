@@ -10,6 +10,7 @@ export type LobbyPlayer = {
   focusPointDeduction: number
   disqualifiedAt: Date | null
   disqualifyReason: string | null
+  finishedAt: Date | null
 }
 
 export type LobbyState = {

@@ -4,6 +4,8 @@ export type TournamentPlayerWarnedDto = {
   reason: string
   issuedBy: string
   at: string
+  warningCount: number
+  maxWarnings: number
 }
 
 export type TournamentPlayerDisqualifiedDto = {

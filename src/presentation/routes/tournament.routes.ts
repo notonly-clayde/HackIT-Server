@@ -9,7 +9,17 @@ export function createTournamentRoutes(container: Container) {
   const router = Router()
 
   router.get("/", asyncHandler(container.tournamentController.list))
+  router.get(
+    "/moderator-invites",
+    container.authMiddleware,
+    asyncHandler(container.tournamentController.listModeratorInvites),
+  )
   router.post("/", container.authMiddleware, asyncHandler(container.tournamentController.create))
+  router.post(
+    "/:id/moderator-invite/respond",
+    container.authMiddleware,
+    asyncHandler(container.tournamentController.respondModeratorInvite),
+  )
   router.post(
     "/:id/verify-password",
     container.authMiddleware,
@@ -34,6 +44,11 @@ export function createTournamentRoutes(container: Container) {
     "/:id/end",
     container.authMiddleware,
     asyncHandler(container.tournamentLiveController.end),
+  )
+  router.post(
+    "/:id/accept-score",
+    container.authMiddleware,
+    asyncHandler(container.tournamentLiveController.acceptScore),
   )
   router.get(
     "/:id/standings",

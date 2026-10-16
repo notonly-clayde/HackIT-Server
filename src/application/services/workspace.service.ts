@@ -195,6 +195,9 @@ export class WorkspaceService {
     if (player.disqualifiedAt) {
       throw new ForbiddenError("You have been disqualified from this tournament")
     }
+    if (player.finishedAt) {
+      throw new ForbiddenError("You accepted your score and left the contest")
+    }
   }
 
   private async assertSpectateWorkspaceAccess(tournamentId: string, viewerId: string) {

@@ -15,6 +15,7 @@ import {
 import { computeRemainingMs } from "../../shared/tournament/tournament-timer.js"
 import { isUserEmailVerified } from "../../shared/auth/email-verified.js"
 import type { ActivityLogService } from "./activity-log.service.js"
+import type { StandingsService } from "./standings.service.js"
 
 export const RESUME_COUNTDOWN_MS = 5000
 
@@ -29,6 +30,7 @@ export class TournamentLiveService {
     private readonly lobbyRepository: ILobbyRepository,
     private readonly userRepository: IUserRepository,
     private readonly activityLogService: ActivityLogService,
+    private readonly standingsService: StandingsService,
   ) {}
 
   async getTournamentMaybeFinalized(tournamentId: string): Promise<TournamentWithHost | null> {
@@ -291,7 +293,44 @@ export class TournamentLiveService {
       throw new ForbiddenError("Tournament is paused")
     }
 
-    await this.assertActivePlayer(tournamentId, userId)
+    const player = await this.assertActivePlayer(tournamentId, userId)
+    if (player.finishedAt) {
+      throw new ForbiddenError("You accepted your score and left the contest")
+    }
+
+    return tournament
+  }
+
+  async acceptScore(tournamentId: string, userId: string) {
+    let tournament = await this.tournamentRepository.findByIdWithHost(tournamentId)
+    if (!tournament) {
+      throw new NotFoundError("Tournament not found")
+    }
+
+    tournament = await this.finalizeLiveState(tournament)
+
+    if (tournament.status !== "LIVE") {
+      throw new BadRequestError("You can only accept your score during a live tournament")
+    }
+
+    const player = await this.assertActivePlayer(tournamentId, userId)
+    if (player.finishedAt) {
+      throw new BadRequestError("You have already accepted your score for this tournament")
+    }
+
+    const problemEntries = await this.tournamentProblemRepository.findByTournamentId(tournamentId)
+    const problemCount = problemEntries.length
+    if (problemCount === 0) {
+      throw new BadRequestError("This tournament has no problems")
+    }
+
+    const ranked = await this.standingsService.getRankedStandings(tournamentId)
+    const entry = ranked.find((row) => row.userId === userId)
+    if (!entry || entry.solved !== problemCount) {
+      throw new BadRequestError("Accept your score only after solving every problem in the contest")
+    }
+
+    await this.lobbyRepository.markScoreAccepted(tournamentId, userId)
 
     return tournament
   }
@@ -314,6 +353,12 @@ export class TournamentLiveService {
     const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
     if (!player?.disqualifiedAt) return null
     return { at: player.disqualifiedAt, reason: player.disqualifyReason }
+  }
+
+  async findScoreAccepted(tournamentId: string, userId: string): Promise<{ at: Date } | null> {
+    const player = await this.lobbyRepository.findPlayer(tournamentId, userId)
+    if (!player?.finishedAt) return null
+    return { at: player.finishedAt }
   }
 
   async resolveViewerRole(

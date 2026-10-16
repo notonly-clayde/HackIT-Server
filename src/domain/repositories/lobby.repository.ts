@@ -17,6 +17,7 @@ export interface ILobbyRepository {
   leave(tournamentId: string, userId: string): Promise<LobbyState | null>
   /** Returns the player's new total focus deduction. */
   addFocusPointDeduction(tournamentId: string, userId: string, amount: number): Promise<number>
+  markScoreAccepted(tournamentId: string, userId: string): Promise<void>
   syncPlayerCount(tournamentId: string): Promise<number>
   isModerator(tournamentId: string, userId: string): Promise<boolean>
   findPasswordHash(tournamentId: string): Promise<string | null>

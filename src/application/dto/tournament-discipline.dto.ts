@@ -18,6 +18,12 @@ export type TournamentWarningDto = {
   createdAt: string
 }
 
+export type WarnPlayerResultDto = TournamentWarningDto & {
+  playerWarningCount: number
+  maxWarnings: number
+  disqualified: boolean
+}
+
 export type TournamentSuspensionRequestDto = {
   id: string
   playerId: string

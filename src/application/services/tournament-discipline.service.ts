@@ -20,6 +20,14 @@ import type { TournamentLiveService } from "./tournament-live.service.js"
 
 type StaffRole = "host" | "mod"
 
+export const MAX_TOURNAMENT_WARNINGS = 3
+
+export type WarnPlayerResult = TournamentWarningRecord & {
+  playerWarningCount: number
+  maxWarnings: number
+  disqualified: boolean
+}
+
 export class TournamentDisciplineService {
   constructor(
     private readonly tournamentLiveService: TournamentLiveService,
@@ -44,7 +52,7 @@ export class TournamentDisciplineService {
     return { warnings, suspensionRequests }
   }
 
-  async warn(tournamentId: string, actorId: string, playerId: string, reason: string) {
+  async warn(tournamentId: string, actorId: string, playerId: string, reason: string): Promise<WarnPlayerResult> {
     const { tournament } = await this.requireLiveStaff(tournamentId, actorId)
     const player = await this.requireActivePlayer(tournament.id, playerId)
     const actorName = await this.displayName(actorId)
@@ -56,6 +64,9 @@ export class TournamentDisciplineService {
       reason,
     })
 
+    const playerWarningCount = await this.disciplineRepository.countWarnings(tournamentId, playerId)
+    const maxWarnings = MAX_TOURNAMENT_WARNINGS
+
     void this.activityLogService.record({
       action: ACTIVITY_ACTIONS.TOURNAMENT_PLAYER_WARNED,
       actorId,
@@ -63,7 +74,7 @@ export class TournamentDisciplineService {
       targetId: playerId,
       tournamentId,
       summary: `Warned ${player.displayName}: ${reason}`,
-      metadata: { warningId: warning.id, reason },
+      metadata: { warningId: warning.id, reason, playerWarningCount },
     })
 
     this.disciplineNotifier.notifyWarned({
@@ -72,10 +83,30 @@ export class TournamentDisciplineService {
       reason,
       issuedBy: actorName,
       at: warning.createdAt.toISOString(),
+      warningCount: playerWarningCount,
+      maxWarnings,
     })
     this.disciplineNotifier.notifyUpdated(tournamentId)
 
-    return warning
+    let disqualified = false
+    if (playerWarningCount >= maxWarnings) {
+      disqualified = true
+      await this.applyDisqualification({
+        tournamentId,
+        actorId,
+        playerId,
+        reason: `Automatic disqualification: ${maxWarnings} warnings (last: ${reason})`,
+        requestId: null,
+        note: null,
+      })
+    }
+
+    return {
+      ...warning,
+      playerWarningCount,
+      maxWarnings,
+      disqualified,
+    }
   }
 
   async requestSuspension(tournamentId: string, actorId: string, playerId: string, reason: string) {

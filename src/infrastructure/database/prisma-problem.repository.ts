@@ -181,6 +181,10 @@ export class PrismaProblemRepository implements IProblemRepository {
 
     return toProblemWithTests(record)
   }
+
+  async delete(id: string): Promise<void> {
+    await prisma.problem.delete({ where: { id } })
+  }
 }
 
 export { difficultyMap }

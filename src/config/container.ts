@@ -20,6 +20,7 @@ import { UserService } from "../application/services/user.service.js"
 import { TournamentService } from "../application/services/tournament.service.js"
 import { LobbyService } from "../application/services/lobby.service.js"
 import { ProblemService } from "../application/services/problem.service.js"
+import { ProblemAiService } from "../application/services/problem-ai.service.js"
 import { ReportService } from "../application/services/report.service.js"
 import { AdminUserService } from "../application/services/admin-user.service.js"
 import { ActivityLogService } from "../application/services/activity-log.service.js"
@@ -63,6 +64,12 @@ import {
   createTournamentDisciplineNotifier,
   type TournamentDisciplineNotifier,
 } from "../shared/realtime/tournament-discipline-notifier.js"
+import {
+  createModeratorInviteNotifier,
+  type ModeratorInviteNotifier,
+} from "../shared/realtime/moderator-invite-notifier.js"
+import { PrismaTournamentModeratorInviteRepository } from "../infrastructure/database/prisma-tournament-moderator-invite.repository.js"
+import { TournamentModeratorInviteService } from "../application/services/tournament-moderator-invite.service.js"
 
 
 export type ContainerDeps = {
@@ -73,6 +80,7 @@ export type ContainerDeps = {
   tournamentProblemSetNotifier?: TournamentProblemSetNotifier
   versusMatchNotifier?: VersusMatchNotifier
   tournamentDisciplineNotifier?: TournamentDisciplineNotifier
+  moderatorInviteNotifier?: ModeratorInviteNotifier
 }
 
 export type Container = {
@@ -114,8 +122,10 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
   const versusMatchNotifier = deps.versusMatchNotifier ?? createVersusMatchNotifier()
   const tournamentDisciplineNotifier =
     deps.tournamentDisciplineNotifier ?? createTournamentDisciplineNotifier()
+  const moderatorInviteNotifier = deps.moderatorInviteNotifier ?? createModeratorInviteNotifier()
 
   const userRepository = new PrismaUserRepository()
+  const tournamentModeratorInviteRepository = new PrismaTournamentModeratorInviteRepository()
   const reportRepository = new PrismaReportRepository()
   const activityLogRepository = new PrismaActivityLogRepository()
   const tournamentRepository = new PrismaTournamentRepository()
@@ -142,15 +152,34 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     activityLogService,
     env.ADMIN_EMAILS,
   )
-  const tournamentService = new TournamentService(tournamentRepository, userRepository, activityLogService)
+  const tournamentModeratorInviteService = new TournamentModeratorInviteService(
+    tournamentModeratorInviteRepository,
+    tournamentRepository,
+    moderatorInviteNotifier,
+    activityLogService,
+  )
+  const tournamentService = new TournamentService(
+    tournamentRepository,
+    userRepository,
+    activityLogService,
+    tournamentModeratorInviteService,
+  )
   const lobbyService = new LobbyService(lobbyRepository, userRepository, activityLogService)
   const problemService = new ProblemService(problemRepository, userRepository, activityLogService)
+  const problemAiService = new ProblemAiService(env)
+  const standingsService = new StandingsService(
+    tournamentRepository,
+    tournamentProblemRepository,
+    tournamentSubmissionRepository,
+    lobbyRepository,
+  )
   const tournamentLiveService = new TournamentLiveService(
     tournamentRepository,
     tournamentProblemRepository,
     lobbyRepository,
     userRepository,
     activityLogService,
+    standingsService,
   )
   const tournamentProblemService = new TournamentProblemService(
     tournamentRepository,
@@ -162,12 +191,6 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     lobbyRepository,
     tournamentProblemSetNotifier,
     activityLogService,
-  )
-  const standingsService = new StandingsService(
-    tournamentRepository,
-    tournamentProblemRepository,
-    tournamentSubmissionRepository,
-    lobbyRepository,
   )
   const profileHistoryService = new ProfileHistoryService(
     userRepository,
@@ -235,13 +258,14 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
       tournamentService,
       tournamentLiveService,
       tournamentCatalogNotifier,
+      tournamentModeratorInviteService,
     ),
     tournamentLiveController: new TournamentLiveController(
       tournamentLiveService,
       tournamentLiveStateNotifier,
     ),
     lobbyController: new LobbyController(lobbyService),
-    problemController: new ProblemController(problemService, userRepository),
+    problemController: new ProblemController(problemService, problemAiService, userRepository),
     tournamentProblemController: new TournamentProblemController(tournamentProblemService),
     submissionController: new SubmissionController(submissionService, userRepository),
     standingsController: new StandingsController(standingsService, tournamentLiveService),

@@ -26,6 +26,7 @@ function toLobbyPlayer(record: {
   focusPointDeduction: number
   disqualifiedAt: Date | null
   disqualifyReason: string | null
+  finishedAt: Date | null
   user: {
     id: string
     displayName: string
@@ -43,6 +44,7 @@ function toLobbyPlayer(record: {
     focusPointDeduction: record.focusPointDeduction,
     disqualifiedAt: record.disqualifiedAt,
     disqualifyReason: record.disqualifyReason,
+    finishedAt: record.finishedAt,
   }
 }
 
@@ -158,6 +160,21 @@ export class PrismaLobbyRepository implements ILobbyRepository {
     })
 
     return buildLobbyState(tournamentId)
+  }
+
+  async markScoreAccepted(tournamentId: string, userId: string): Promise<void> {
+    const result = await prisma.tournamentPlayer.updateMany({
+      where: {
+        tournamentId,
+        userId,
+        finishedAt: null,
+      },
+      data: { finishedAt: new Date() },
+    })
+
+    if (result.count === 0) {
+      throw new Error("TOURNAMENT_SCORE_ALREADY_ACCEPTED")
+    }
   }
 
   async addFocusPointDeduction(tournamentId: string, userId: string, amount: number): Promise<number> {

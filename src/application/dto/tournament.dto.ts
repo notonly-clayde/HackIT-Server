@@ -69,6 +69,7 @@ export type TournamentModeratorDto = {
   id: string
   displayName: string
   email: string
+  inviteStatus?: "pending" | "accepted"
 }
 
 export type TournamentItemDto = {
@@ -98,4 +99,12 @@ export type TournamentItemDto = {
   viewerRole?: "host" | "player" | "mod" | null
   viewerDisqualified?: boolean
   viewerDisqualifyReason?: string | null
+  viewerContestFinished?: boolean
+  moderatorInvites?: Array<{
+    id: string
+    displayName: string
+    email: string
+    status: "pending"
+  }>
+  viewerModeratorInvitePending?: boolean
 }

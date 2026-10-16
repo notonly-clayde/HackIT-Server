@@ -30,9 +30,15 @@ function formatScheduledDate(date: Date, status: TournamentWithHost["status"]): 
     .replace(",", " ·")
 }
 
+export type TournamentItemDtoExtras = {
+  moderatorInvites?: TournamentItemDto["moderatorInvites"]
+  viewerModeratorInvitePending?: boolean
+}
+
 export function toTournamentItemDto(
   tournament: TournamentWithHost,
   viewerRole?: "host" | "player" | "mod" | null,
+  extras?: TournamentItemDtoExtras,
 ): TournamentItemDto {
   const item: TournamentItemDto = {
     id: tournament.id,
@@ -65,6 +71,14 @@ export function toTournamentItemDto(
 
   if (viewerRole !== undefined) {
     item.viewerRole = viewerRole
+  }
+
+  if (extras?.moderatorInvites !== undefined) {
+    item.moderatorInvites = extras.moderatorInvites
+  }
+
+  if (extras?.viewerModeratorInvitePending) {
+    item.viewerModeratorInvitePending = true
   }
 
   return item

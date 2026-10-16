@@ -7,6 +7,7 @@ import type {
 
 export interface ITournamentDisciplineRepository {
   listWarnings(tournamentId: string): Promise<TournamentWarningRecord[]>
+  countWarnings(tournamentId: string, playerId: string): Promise<number>
   listSuspensionRequests(tournamentId: string): Promise<TournamentSuspensionRequestRecord[]>
   createWarning(data: CreateWarningData): Promise<TournamentWarningRecord>
   createSuspensionRequest(data: CreateSuspensionRequestData): Promise<TournamentSuspensionRequestRecord>

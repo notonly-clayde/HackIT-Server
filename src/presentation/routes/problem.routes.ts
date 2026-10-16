@@ -7,9 +7,15 @@ export function createProblemRoutes(container: Container) {
 
   router.get("/", container.authMiddleware, asyncHandler(container.problemController.listCatalog))
   router.get("/mine", container.authMiddleware, asyncHandler(container.problemController.listMine))
+  router.post(
+    "/generate-draft",
+    container.authMiddleware,
+    asyncHandler(container.problemController.generateDraft),
+  )
   router.post("/", container.authMiddleware, asyncHandler(container.problemController.create))
   router.get("/:id", container.authMiddleware, asyncHandler(container.problemController.getById))
   router.patch("/:id", container.authMiddleware, asyncHandler(container.problemController.update))
+  router.delete("/:id", container.authMiddleware, asyncHandler(container.problemController.remove))
   router.post(
     "/:id/submit-review",
     container.authMiddleware,

@@ -154,9 +154,6 @@ export class PrismaTournamentRepository implements ITournamentRepository {
         passwordProtected: data.passwordProtected,
         passwordHash: data.passwordHash,
         hostId: data.hostId,
-        moderators: {
-          create: data.moderatorIds.map((userId) => ({ userId })),
-        },
       },
       include: hostInclude,
     })
@@ -166,22 +163,6 @@ export class PrismaTournamentRepository implements ITournamentRepository {
 
   async update(id: string, data: UpdateTournamentData): Promise<TournamentWithHost> {
     await prisma.$transaction(async (tx) => {
-      if (data.moderatorIds) {
-        await tx.tournamentModerator.deleteMany({ where: { tournamentId: id } })
-        if (data.moderatorIds.length > 0) {
-          await tx.tournamentModerator.createMany({
-            data: data.moderatorIds.map((userId) => ({ tournamentId: id, userId })),
-          })
-          const removed = await tx.tournamentPlayer.deleteMany({
-            where: { tournamentId: id, userId: { in: data.moderatorIds } },
-          })
-          if (removed.count > 0) {
-            const playerCount = await tx.tournamentPlayer.count({ where: { tournamentId: id } })
-            await tx.tournament.update({ where: { id }, data: { playerCount } })
-          }
-        }
-      }
-
       await tx.tournament.update({
         where: { id },
         data: {

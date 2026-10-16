@@ -1,5 +1,7 @@
 import type { Request, Response } from "express"
 import type { ProblemService } from "../../application/services/problem.service.js"
+import type { ProblemAiService } from "../../application/services/problem-ai.service.js"
+import { generateProblemDraftSchema } from "../../application/dto/problem-ai.dto.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
 import {
   createProblemSchema,
@@ -17,6 +19,7 @@ import { BadRequestError, UnauthorizedError } from "../../shared/errors/app-erro
 export class ProblemController {
   constructor(
     private readonly problemService: ProblemService,
+    private readonly problemAiService: ProblemAiService,
     private readonly userRepository: IUserRepository,
   ) {}
 
@@ -45,6 +48,17 @@ export class ProblemController {
 
     const problem = await this.problemService.create(auth.userId, auth.emailVerified, parsed.data)
     res.status(201).json(toHostProblemDetailDto(problem))
+  }
+
+  generateDraft = async (req: Request, res: Response) => {
+    this.requireAuth(req)
+    const parsed = generateProblemDraftSchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new BadRequestError(parsed.error.issues[0]?.message ?? "Invalid request body")
+    }
+
+    const draft = await this.problemAiService.generateDraft(parsed.data)
+    res.json(draft)
   }
 
   getById = async (req: Request, res: Response) => {
@@ -77,6 +91,14 @@ export class ProblemController {
 
     const problem = await this.problemService.submitForReview(id, auth.userId, auth.emailVerified)
     res.json(toHostProblemDetailDto(problem))
+  }
+
+  remove = async (req: Request, res: Response) => {
+    const auth = this.requireAuth(req)
+    const id = this.requireId(req.params.id)
+
+    await this.problemService.delete(id, auth.userId, auth.emailVerified)
+    res.status(204).send()
   }
 
   listPendingAdmin = async (_req: Request, res: Response) => {
@@ -126,4 +148,4 @@ export class ProblemController {
     return user?.role === "ADMIN"
   }
 }
-
+
