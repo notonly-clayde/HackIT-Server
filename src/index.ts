@@ -1,8 +1,8 @@
+import "./load-env.js"
+
 import dns from "node:dns"
 
 import { createServer } from "node:http"
-
-import "dotenv/config"
 
 import { createApp } from "./app.js"
 

@@ -1,3 +1,4 @@
+import dotenv from "dotenv"
 import type { Env } from "../../config/env.js"
 import type { GenerateProblemDraftDto, GeneratedProblemDraftDto } from "../dto/problem-ai.dto.js"
 import { createProblemSchema } from "../dto/problem.dto.js"
@@ -53,19 +54,25 @@ JSON schema (types):
 }
 
 export class ProblemAiService {
-  private readonly gemini: GeminiClient | null
+  constructor(private readonly env: Env) {}
 
-  constructor(private readonly env: Env) {
-    this.gemini =
-      env.GEMINI_API_KEY.trim().length > 0
-        ? new GeminiClient(env.GEMINI_API_KEY, env.GEMINI_MODEL)
-        : null
+  private resolveGeminiClient(): GeminiClient | null {
+    if (this.env.NODE_ENV !== "production") {
+      dotenv.config({ override: true })
+    }
+
+    const apiKey = (process.env.GEMINI_API_KEY ?? this.env.GEMINI_API_KEY).trim()
+    const model = (process.env.GEMINI_MODEL ?? this.env.GEMINI_MODEL).trim() || "gemini-2.5-flash"
+
+    if (!apiKey) return null
+    return new GeminiClient(apiKey, model)
   }
 
   async generateDraft(input: GenerateProblemDraftDto): Promise<GeneratedProblemDraftDto> {
-    if (!this.gemini) {
+    const gemini = this.resolveGeminiClient()
+    if (!gemini) {
       throw new ServiceUnavailableError(
-        "AI problem generation is not configured. Set GEMINI_API_KEY on the server.",
+        "AI problem generation is not configured. Set GEMINI_API_KEY in hackit_server/.env and restart the server.",
       )
     }
 
@@ -83,7 +90,7 @@ Generate a complete original problem draft.`
 
     let raw: string
     try {
-      raw = await this.gemini.generateText(buildSystemInstruction(input.inputMode), userPrompt)
+      raw = await gemini.generateText(buildSystemInstruction(input.inputMode), userPrompt)
     } catch (err) {
       throw err
     }
