@@ -63,6 +63,12 @@ enum TournamentStatus {
   ENDED
 }
 
+enum TournamentEndReason {
+  HOST
+  TIMER
+  ALL_PLAYERS_FINISHED
+}
+
 enum Visibility {
   PUBLIC
   PRIVATE
@@ -247,7 +253,9 @@ model Tournament {
   pausedAt          DateTime?
   resumeAt          DateTime?
   pausedTotalMs     Int              @default(0)
-  endedAt           DateTime?
+  endedAt               DateTime?
+  endReason             TournamentEndReason?
+  playerStatsAppliedAt  DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -297,6 +305,8 @@ model TournamentPlayer {
   disqualifiedAt      DateTime?
   disqualifyReason    String?
   finishedAt          DateTime?
+  eloBefore           Int?
+  eloAfter            Int?
   tournament   Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 

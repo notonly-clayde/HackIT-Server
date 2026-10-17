@@ -1,4 +1,5 @@
-import type { TournamentWithHost } from "../../domain/entities/tournament.entity.js"
+import type { TournamentEndReason, TournamentWithHost } from "../../domain/entities/tournament.entity.js"
+import type { TournamentEndReasonDto } from "../../shared/realtime/tournament-live-state-notifier.js"
 import type { TournamentItemDto } from "../dto/tournament.dto.js"
 import type { TournamentLiveStateDto } from "../../shared/realtime/tournament-live-state-notifier.js"
 
@@ -13,6 +14,19 @@ const statusLabels = {
   LIVE: "Live",
   ENDED: "Ended",
 } as const
+
+const endReasonLabels: Record<TournamentEndReason, TournamentEndReasonDto> = {
+  HOST: "host",
+  TIMER: "timer",
+  ALL_PLAYERS_FINISHED: "all_players_finished",
+}
+
+export function toTournamentEndReasonDto(
+  reason: TournamentEndReason | null,
+): TournamentEndReasonDto | null {
+  if (!reason) return null
+  return endReasonLabels[reason]
+}
 
 function formatScheduledDate(date: Date, status: TournamentWithHost["status"]): string {
   if (status === "LIVE") {
@@ -63,6 +77,7 @@ export function toTournamentItemDto(
     resumeAt: tournament.resumeAt?.toISOString() ?? null,
     pausedTotalMs: tournament.pausedTotalMs,
     endedAt: tournament.endedAt?.toISOString() ?? null,
+    endReason: toTournamentEndReasonDto(tournament.endReason),
   }
 
   if (tournament.passwordProtected) {
@@ -93,6 +108,7 @@ export function toTournamentLiveStateDto(tournament: TournamentWithHost): Tourna
     resumeAt: tournament.resumeAt?.toISOString() ?? null,
     pausedTotalMs: tournament.pausedTotalMs,
     endedAt: tournament.endedAt?.toISOString() ?? null,
+    endReason: toTournamentEndReasonDto(tournament.endReason),
     durationMinutes: tournament.durationMinutes,
   }
 }

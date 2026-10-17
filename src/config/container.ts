@@ -33,6 +33,7 @@ import { VersusService } from "../application/services/versus.service.js"
 import { ProfileHistoryService } from "../application/services/profile-history.service.js"
 import { IntegrityService } from "../application/services/integrity.service.js"
 import { TournamentDisciplineService } from "../application/services/tournament-discipline.service.js"
+import { TournamentPlayerStatsService } from "../application/services/tournament-player-stats.service.js"
 
 import { AuthController } from "../presentation/controllers/auth.controller.js"
 import { UserController } from "../presentation/controllers/user.controller.js"
@@ -173,6 +174,11 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     tournamentSubmissionRepository,
     lobbyRepository,
   )
+  const tournamentPlayerStatsService = new TournamentPlayerStatsService(
+    tournamentRepository,
+    userRepository,
+    standingsService,
+  )
   const tournamentLiveService = new TournamentLiveService(
     tournamentRepository,
     tournamentProblemRepository,
@@ -180,6 +186,7 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     userRepository,
     activityLogService,
     standingsService,
+    tournamentPlayerStatsService,
   )
   const tournamentProblemService = new TournamentProblemService(
     tournamentRepository,
@@ -197,6 +204,7 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     matchRepository,
     tournamentRepository,
     standingsService,
+    lobbyRepository,
   )
   const submissionService = new SubmissionService(
     problemRepository,
@@ -263,6 +271,8 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     tournamentLiveController: new TournamentLiveController(
       tournamentLiveService,
       tournamentLiveStateNotifier,
+      standingsService,
+      tournamentStandingsNotifier,
     ),
     lobbyController: new LobbyController(lobbyService),
     problemController: new ProblemController(problemService, problemAiService, userRepository),

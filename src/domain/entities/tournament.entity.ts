@@ -1,5 +1,6 @@
 export type BattleType = "ONE_V_ONE" | "FREE_FOR_ALL"
 export type TournamentStatus = "OPEN" | "SOON" | "LIVE" | "ENDED"
+export type TournamentEndReason = "HOST" | "TIMER" | "ALL_PLAYERS_FINISHED"
 export type Visibility = "PUBLIC" | "PRIVATE"
 export type StartMode = "MANUAL" | "AUTO"
 
@@ -28,6 +29,8 @@ export type Tournament = {
   resumeAt: Date | null
   pausedTotalMs: number
   endedAt: Date | null
+  endReason: TournamentEndReason | null
+  playerStatsAppliedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -85,5 +88,7 @@ export type UpdateTournamentData = {
   resumeAt?: Date | null
   pausedTotalMs?: number
   endedAt?: Date | null
+  endReason?: TournamentEndReason | null
+  playerStatsAppliedAt?: Date | null
   moderatorIds?: string[]
 }

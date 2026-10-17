@@ -102,6 +102,21 @@ export class IntegrityService {
     if (match.status !== "LIVE" || !match.playerB) throw new BadRequestError("Match is not live")
 
     const seat = match.playerAId === userId ? "a" : match.playerBId === userId ? "b" : null
+    if (match.kind === "PRIVATE") {
+      const selfEarly = seat === "a" ? match.playerA : seat === "b" ? match.playerB : null
+      if (!seat || !selfEarly) throw new ForbiddenError("You are not a player in this match")
+      const opponentIdEarly = seat === "a" ? match.playerB.id : match.playerA.id
+      return {
+        applied: false,
+        userId,
+        displayName: selfEarly.displayName,
+        opponentId: opponentIdEarly,
+        deduction: 0,
+        totalDeduction: 0,
+        at: new Date().toISOString(),
+      }
+    }
+
     if (!seat) throw new ForbiddenError("You are not a player in this match")
 
     const self = seat === "a" ? match.playerA : match.playerB

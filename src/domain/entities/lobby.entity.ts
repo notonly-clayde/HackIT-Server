@@ -11,6 +11,8 @@ export type LobbyPlayer = {
   disqualifiedAt: Date | null
   disqualifyReason: string | null
   finishedAt: Date | null
+  eloBefore: number | null
+  eloAfter: number | null
 }
 
 export type LobbyState = {

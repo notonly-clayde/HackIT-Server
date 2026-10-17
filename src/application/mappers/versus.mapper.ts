@@ -1,7 +1,17 @@
-import type { MatchHistoryRecord, MatchWithPlayers } from "../../domain/entities/match.entity.js"
+import type {
+  HostedPrivateMatchRecord,
+  MatchHistoryRecord,
+  MatchStatus,
+  MatchWithPlayers,
+  ProfileMatchHistoryRecord,
+} from "../../domain/entities/match.entity.js"
 import type { User } from "../../domain/entities/user.entity.js"
 import { toPlayerProblemDetailDto } from "./problem.mapper.js"
-import type { MatchHistoryItemDto } from "../dto/user.dto.js"
+import type {
+  HostedPrivateRoomItemDto,
+  MatchHistoryItemDto,
+  ProfileHistoryPrivateItemDto,
+} from "../dto/user.dto.js"
 import type { VersusEndedReason, VersusMatchDto, VersusPlayerCardDto } from "../dto/versus.dto.js"
 
 const statusLabels = {
@@ -89,6 +99,7 @@ export function toMatchHistoryItemDto(match: MatchHistoryRecord, profileUserId: 
 
   return {
     matchId: match.id,
+    matchKind: match.kind === "PRIVATE" ? "private" : "ranked",
     endedAt: (match.endedAt ?? new Date(0)).toISOString(),
     difficulty: difficultyLabels[match.difficulty],
     endedReason: parseEndedReason(match.endedReason, "ENDED"),
@@ -101,5 +112,64 @@ export function toMatchHistoryItemDto(match: MatchHistoryRecord, profileUserId: 
       displayName: opponent.displayName,
       avatarUrl: opponent.avatarUrl,
     },
+  }
+}
+
+function privateRoomDisplayName(lobbyName: string | null): string {
+  const trimmed = lobbyName?.trim()
+  return trimmed ? trimmed : "Private room"
+}
+
+export function toPrivateHistoryItemDto(match: ProfileMatchHistoryRecord): ProfileHistoryPrivateItemDto {
+  return {
+    kind: "private",
+    matchId: match.id,
+    name: privateRoomDisplayName(match.lobbyName),
+    endedAt: (match.endedAt ?? new Date(0)).toISOString(),
+    difficulty: difficultyLabels[match.difficulty],
+    passwordProtected: Boolean(match.passwordHash),
+    outcome: "aborted",
+  }
+}
+
+function privateMatchHostedStatus(status: MatchStatus): HostedPrivateRoomItemDto["status"] {
+  if (status === "LIVE") return "Live"
+  if (status === "LOBBY") return "Open"
+  return "Ended"
+}
+
+export function toPrivateHostedRoomItemDto(match: HostedPrivateMatchRecord): HostedPrivateRoomItemDto {
+  return {
+    lobbyKind: "privateRoom",
+    id: match.id,
+    name: privateRoomDisplayName(match.lobbyName),
+    type: "1v1 Match",
+    status: privateMatchHostedStatus(match.status),
+    players: match.playerBId ? 2 : 1,
+    maxPlayers: 2,
+    passwordProtected: Boolean(match.passwordHash),
+    createdAt: match.createdAt.toISOString(),
+  }
+}
+
+export function profileMatchToHistoryRecord(match: ProfileMatchHistoryRecord): MatchHistoryRecord | null {
+  if (!match.playerB || !match.playerBId || match.playerBEloBefore === null) {
+    return null
+  }
+  return {
+    id: match.id,
+    kind: match.kind,
+    difficulty: match.difficulty,
+    endedAt: match.endedAt,
+    winnerId: match.winnerId,
+    playerAId: match.playerAId,
+    playerBId: match.playerBId,
+    playerAEloBefore: match.playerAEloBefore,
+    playerBEloBefore: match.playerBEloBefore,
+    playerAEloAfter: match.playerAEloAfter,
+    playerBEloAfter: match.playerBEloAfter,
+    endedReason: match.endedReason,
+    playerA: match.playerA,
+    playerB: match.playerB,
   }
 }

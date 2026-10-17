@@ -29,19 +29,47 @@ export class StandingsService {
     }
 
     const ranked = await this.getRankedStandings(tournamentId)
+    const includeElo =
+      tournament.status === "ENDED" && tournament.playerStatsAppliedAt !== null
+    const lobby = includeElo ? await this.lobbyRepository.findLobbyState(tournamentId) : null
+    const eloByUserId = new Map(
+      (lobby?.players ?? []).map((player) => [
+        player.id,
+        { eloBefore: player.eloBefore, eloAfter: player.eloAfter },
+      ]),
+    )
 
     return {
       tournamentId,
       updatedAt: new Date().toISOString(),
-      entries: ranked.map((entry) => ({
-        rank: entry.rank,
-        userId: entry.userId,
-        displayName: entry.displayName,
-        solved: entry.solved,
-        penalty: entry.penalty,
-        score: entry.score,
-        disqualified: entry.disqualified,
-      })),
+      entries: ranked.map((entry) => {
+        const base = {
+          rank: entry.rank,
+          userId: entry.userId,
+          displayName: entry.displayName,
+          solved: entry.solved,
+          penalty: entry.penalty,
+          score: entry.score,
+          disqualified: entry.disqualified,
+        }
+        if (!includeElo) {
+          return base
+        }
+        const elo = eloByUserId.get(entry.userId)
+        if (
+          elo?.eloBefore == null ||
+          elo.eloAfter == null ||
+          entry.disqualified
+        ) {
+          return base
+        }
+        return {
+          ...base,
+          eloBefore: elo.eloBefore,
+          eloAfter: elo.eloAfter,
+          eloDelta: elo.eloAfter - elo.eloBefore,
+        }
+      }),
     }
   }
 

@@ -2,8 +2,10 @@ import type {
   AttachPlayerBData,
   CreateMatchData,
   CreateMatchSubmissionData,
+  HostedPrivateMatchRecord,
   MatchHistoryRecord,
   MatchRecord,
+  ProfileMatchHistoryRecord,
   MatchStatus,
   MatchSubmissionRecord,
   MatchWithPlayers,
@@ -32,4 +34,6 @@ export interface IMatchRepository {
   hasAccepted(matchId: string): Promise<boolean>
   findLatestSubmissions(matchId: string): Promise<MatchSubmissionRecord[]>
   findRecentEndedByUserId(userId: string, limit: number): Promise<MatchHistoryRecord[]>
+  findRecentProfileMatchesByUserId(userId: string, limit: number): Promise<ProfileMatchHistoryRecord[]>
+  findPrivateHostedByHostId(hostId: string): Promise<HostedPrivateMatchRecord[]>
 }

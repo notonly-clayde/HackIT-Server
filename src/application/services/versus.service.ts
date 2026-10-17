@@ -407,22 +407,29 @@ export class VersusService {
       return match
     }
 
-    const k = ELO_K_BY_DIFFICULTY[match.difficulty]
     const aBefore = match.playerAEloBefore
     const bBefore = match.playerBEloBefore
+    const isPrivate = match.kind === "PRIVATE"
 
-    let aScore: 0 | 0.5 | 1 = 0.5
-    let bScore: 0 | 0.5 | 1 = 0.5
-    if (winnerId === match.playerAId) {
-      aScore = 1
-      bScore = 0
-    } else if (winnerId === match.playerBId) {
-      aScore = 0
-      bScore = 1
+    let aAfter: number
+    let bAfter: number
+    if (isPrivate) {
+      aAfter = aBefore
+      bAfter = bBefore
+    } else {
+      const k = ELO_K_BY_DIFFICULTY[match.difficulty]
+      let aScore: 0 | 0.5 | 1 = 0.5
+      let bScore: 0 | 0.5 | 1 = 0.5
+      if (winnerId === match.playerAId) {
+        aScore = 1
+        bScore = 0
+      } else if (winnerId === match.playerBId) {
+        aScore = 0
+        bScore = 1
+      }
+      aAfter = Math.max(ELO_FLOOR, applyEloDelta(aBefore, bBefore, aScore, k) - match.playerAFocusEloPenalty)
+      bAfter = Math.max(ELO_FLOOR, applyEloDelta(bBefore, aBefore, bScore, k) - match.playerBFocusEloPenalty)
     }
-
-    const aAfter = Math.max(ELO_FLOOR, applyEloDelta(aBefore, bBefore, aScore, k) - match.playerAFocusEloPenalty)
-    const bAfter = Math.max(ELO_FLOOR, applyEloDelta(bBefore, aBefore, bScore, k) - match.playerBFocusEloPenalty)
 
     const settled = await this.matchRepository.settle(
       match.id,
@@ -443,8 +450,10 @@ export class VersusService {
       return fresh
     }
 
-    await this.applyPlayerStats(settled.playerA, aAfter, winnerId === settled.playerAId, winnerId === null)
-    await this.applyPlayerStats(settled.playerB, bAfter, winnerId === settled.playerBId, winnerId === null)
+    if (!isPrivate) {
+      await this.applyPlayerStats(settled.playerA, aAfter, winnerId === settled.playerAId, winnerId === null)
+      await this.applyPlayerStats(settled.playerB, bAfter, winnerId === settled.playerBId, winnerId === null)
+    }
 
     const refreshed = (await this.matchRepository.findById(settled.id)) ?? settled
 
@@ -504,10 +513,12 @@ export class VersusService {
           ? "timeout"
           : "first_ac"
 
+    const yourEloDelta = match.kind === "PRIVATE" ? 0 : after - before
+
     return {
       match: matchDto,
       result,
-      yourEloDelta: after - before,
+      yourEloDelta,
       endedReason,
       solveElapsedMinutes,
     }

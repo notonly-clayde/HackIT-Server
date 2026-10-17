@@ -27,6 +27,8 @@ function toLobbyPlayer(record: {
   disqualifiedAt: Date | null
   disqualifyReason: string | null
   finishedAt: Date | null
+  eloBefore: number | null
+  eloAfter: number | null
   user: {
     id: string
     displayName: string
@@ -45,6 +47,8 @@ function toLobbyPlayer(record: {
     disqualifiedAt: record.disqualifiedAt,
     disqualifyReason: record.disqualifyReason,
     finishedAt: record.finishedAt,
+    eloBefore: record.eloBefore,
+    eloAfter: record.eloAfter,
   }
 }
 
