@@ -153,6 +153,10 @@ export class PrismaMatchRepository implements IMatchRepository {
     return records.map(toMatch)
   }
 
+  async countByStatus(status: MatchStatus): Promise<number> {
+    return prisma.match.count({ where: { status } })
+  }
+
   async startLive(id: string, startedAt: Date): Promise<MatchWithPlayers | null> {
     const updated = await prisma.match.updateMany({
       where: { id, status: "LOBBY", playerBId: { not: null } },

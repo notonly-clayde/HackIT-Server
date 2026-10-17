@@ -207,6 +207,10 @@ export class PrismaTournamentRepository implements ITournamentRepository {
     return record?.passwordHash ?? null
   }
 
+  async countByStatus(status: TournamentStatus): Promise<number> {
+    return prisma.tournament.count({ where: { status } })
+  }
+
   async findRecentEndedParticipationsByUserId(
     userId: string,
     limit: number,

@@ -22,6 +22,7 @@ export interface IUserRepository {
   /** Active, email-verified users matching email, display name, or name. */
   findForModeratorLookup(query: string, excludeUserId: string, limit: number): Promise<User[]>
   countAdmins(): Promise<number>
+  countAll(): Promise<number>
   updateProfile(id: string, input: UpdateUserProfileInput): Promise<User>
   updateMatchStats(id: string, input: UpdateMatchStatsInput): Promise<User>
   setSuspended(id: string, reason: string): Promise<User>

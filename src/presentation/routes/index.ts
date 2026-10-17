@@ -11,6 +11,7 @@ import {
   createReportRoutes,
 } from "./moderation.routes.js"
 import { createAdminActivityLogRoutes } from "./activity-log.routes.js"
+import { createAdminDashboardRoutes } from "./admin-dashboard.routes.js"
 import { createVersusRoutes } from "./versus.routes.js"
 
 export function createApiRoutes(container: Container) {
@@ -27,6 +28,7 @@ export function createApiRoutes(container: Container) {
   router.use("/admin/reports", createAdminReportRoutes(container))
   router.use("/admin/users", createAdminUserRoutes(container))
   router.use("/admin/activity-logs", createAdminActivityLogRoutes(container))
+  router.use("/admin/dashboard", createAdminDashboardRoutes(container))
 
   return router
 }

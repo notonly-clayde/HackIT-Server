@@ -22,6 +22,7 @@ export interface IMatchRepository {
   create(data: CreateMatchData): Promise<MatchWithPlayers>
   findById(id: string): Promise<MatchWithPlayers | null>
   findByStatus(status: MatchStatus): Promise<MatchWithPlayers[]>
+  countByStatus(status: MatchStatus): Promise<number>
   startLive(id: string, startedAt: Date): Promise<MatchWithPlayers | null>
   /** Fills the empty seat of a waiting private room; null if the room is no longer open. */
   attachPlayerB(id: string, data: AttachPlayerBData): Promise<MatchWithPlayers | null>

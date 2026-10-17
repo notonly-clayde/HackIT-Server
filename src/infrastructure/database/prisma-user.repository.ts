@@ -159,6 +159,10 @@ export class PrismaUserRepository implements IUserRepository {
     return prisma.user.count({ where: { role: "ADMIN" } })
   }
 
+  async countAll(): Promise<number> {
+    return prisma.user.count()
+  }
+
   async updateProfile(id: string, input: UpdateUserProfileInput): Promise<User> {
     const data: Prisma.UserUpdateInput = {}
 

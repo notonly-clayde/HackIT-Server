@@ -23,6 +23,7 @@ import { ProblemService } from "../application/services/problem.service.js"
 import { ProblemAiService } from "../application/services/problem-ai.service.js"
 import { ReportService } from "../application/services/report.service.js"
 import { AdminUserService } from "../application/services/admin-user.service.js"
+import { AdminDashboardService } from "../application/services/admin-dashboard.service.js"
 import { ActivityLogService } from "../application/services/activity-log.service.js"
 import { TournamentProblemService } from "../application/services/tournament-problem.service.js"
 import { TournamentLiveService } from "../application/services/tournament-live.service.js"
@@ -46,6 +47,7 @@ import { StandingsController } from "../presentation/controllers/standings.contr
 import { WorkspaceController } from "../presentation/controllers/workspace.controller.js"
 import { HealthController } from "../presentation/controllers/health.controller.js"
 import { AdminUserController, ReportController } from "../presentation/controllers/moderation.controller.js"
+import { AdminDashboardController } from "../presentation/controllers/admin-dashboard.controller.js"
 import { ActivityLogController } from "../presentation/controllers/activity-log.controller.js"
 import { VersusController } from "../presentation/controllers/versus.controller.js"
 import { TournamentDisciplineController } from "../presentation/controllers/tournament-discipline.controller.js"
@@ -92,6 +94,7 @@ export type Container = {
   userController: UserController
   reportController: ReportController
   adminUserController: AdminUserController
+  adminDashboardController: AdminDashboardController
   activityLogController: ActivityLogController
   tournamentController: TournamentController
   tournamentLiveController: TournamentLiveController
@@ -151,6 +154,12 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     reportRepository,
     activityLogService,
     env.ADMIN_EMAILS,
+  )
+  const adminDashboardService = new AdminDashboardService(
+    userRepository,
+    tournamentRepository,
+    matchRepository,
+    reportRepository,
   )
   const tournamentModeratorInviteService = new TournamentModeratorInviteService(
     tournamentModeratorInviteRepository,
@@ -253,6 +262,7 @@ export function createContainer(env: Env, deps: ContainerDeps = {}): Container {
     userController: new UserController(userService, profileHistoryService),
     reportController: new ReportController(reportService),
     adminUserController: new AdminUserController(adminUserService),
+    adminDashboardController: new AdminDashboardController(adminDashboardService),
     activityLogController: new ActivityLogController(activityLogService),
     tournamentController: new TournamentController(
       tournamentService,
