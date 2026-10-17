@@ -1,3 +1,5 @@
+export type TournamentEndReasonDto = "host" | "timer" | "all_players_finished"
+
 export type TournamentLiveStateDto = {
   tournamentId: string
   status: "Open" | "Soon" | "Live" | "Ended"
@@ -6,6 +8,7 @@ export type TournamentLiveStateDto = {
   resumeAt: string | null
   pausedTotalMs: number
   endedAt: string | null
+  endReason: TournamentEndReasonDto | null
   durationMinutes: number
 }
 

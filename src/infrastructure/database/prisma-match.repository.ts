@@ -3,8 +3,11 @@ import type {
   AttachPlayerBData,
   CreateMatchData,
   CreateMatchSubmissionData,
+  HostedPrivateMatchRecord,
   MatchHistoryRecord,
+  MatchKind,
   MatchStatus,
+  ProfileMatchHistoryRecord,
   MatchSubmissionRecord,
   MatchWithPlayers,
   SubmissionVerdict,
@@ -280,15 +283,56 @@ export class PrismaMatchRepository implements IMatchRepository {
   }
 
   async findRecentEndedByUserId(userId: string, limit: number): Promise<MatchHistoryRecord[]> {
+    const records = await this.findRecentProfileMatchesByUserId(userId, limit)
+    return records.flatMap((record) => {
+      if (record.status !== "ENDED" || !record.playerB || !record.playerBId || record.playerBEloBefore === null) {
+        return []
+      }
+      return [
+        {
+          id: record.id,
+          kind: record.kind,
+          difficulty: record.difficulty,
+          endedAt: record.endedAt,
+          winnerId: record.winnerId,
+          playerAId: record.playerAId,
+          playerBId: record.playerBId,
+          playerAEloBefore: record.playerAEloBefore,
+          playerBEloBefore: record.playerBEloBefore,
+          playerAEloAfter: record.playerAEloAfter,
+          playerBEloAfter: record.playerBEloAfter,
+          endedReason: record.endedReason,
+          playerA: record.playerA,
+          playerB: record.playerB,
+        },
+      ]
+    })
+  }
+
+  async findRecentProfileMatchesByUserId(userId: string, limit: number): Promise<ProfileMatchHistoryRecord[]> {
     const records = await prisma.match.findMany({
       where: {
-        status: "ENDED",
-        OR: [{ playerAId: userId }, { playerBId: userId }],
+        OR: [
+          {
+            status: "ENDED",
+            kind: "RANKED",
+            OR: [{ playerAId: userId }, { playerBId: userId }],
+          },
+          {
+            status: "ABORTED",
+            kind: "PRIVATE",
+            OR: [{ playerAId: userId }, { playerBId: userId }],
+          },
+        ],
       },
       orderBy: { endedAt: "desc" },
       take: limit,
       select: {
         id: true,
+        kind: true,
+        status: true,
+        lobbyName: true,
+        passwordHash: true,
         difficulty: true,
         endedAt: true,
         winnerId: true,
@@ -304,10 +348,54 @@ export class PrismaMatchRepository implements IMatchRepository {
       },
     })
 
-    return records.flatMap(({ playerB, playerBId, playerBEloBefore, ...rest }) =>
-      playerB && playerBId && playerBEloBefore !== null
-        ? [{ ...rest, playerB, playerBId, playerBEloBefore }]
-        : [],
-    )
+    return records.map((record) => ({
+      id: record.id,
+      kind: record.kind as MatchKind,
+      status: record.status as MatchStatus,
+      lobbyName: record.lobbyName,
+      passwordHash: record.passwordHash,
+      difficulty: record.difficulty,
+      endedAt: record.endedAt,
+      winnerId: record.winnerId,
+      playerAId: record.playerAId,
+      playerBId: record.playerBId,
+      playerAEloBefore: record.playerAEloBefore,
+      playerBEloBefore: record.playerBEloBefore,
+      playerAEloAfter: record.playerAEloAfter,
+      playerBEloAfter: record.playerBEloAfter,
+      endedReason: record.endedReason,
+      playerA: record.playerA,
+      playerB: record.playerB,
+    }))
+  }
+
+  async findPrivateHostedByHostId(hostId: string): Promise<HostedPrivateMatchRecord[]> {
+    const records = await prisma.match.findMany({
+      where: { kind: "PRIVATE", playerAId: hostId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        lobbyName: true,
+        passwordHash: true,
+        status: true,
+        playerBId: true,
+        durationMinutes: true,
+        createdAt: true,
+        endedAt: true,
+        startedAt: true,
+      },
+    })
+
+    return records.map((record) => ({
+      id: record.id,
+      lobbyName: record.lobbyName,
+      passwordHash: record.passwordHash,
+      status: record.status as MatchStatus,
+      playerBId: record.playerBId,
+      durationMinutes: record.durationMinutes,
+      createdAt: record.createdAt,
+      endedAt: record.endedAt,
+      startedAt: record.startedAt,
+    }))
   }
 }

@@ -7,8 +7,10 @@ import {
 } from "../../application/mappers/tournament.mapper.js"
 import { BadRequestError, UnauthorizedError } from "../../shared/errors/app-error.js"
 import type { TournamentLiveStateNotifier } from "../../shared/realtime/tournament-live-state-notifier.js"
+import type { TournamentStandingsNotifier } from "../../shared/realtime/tournament-standings-notifier.js"
 import type { TournamentWithHost } from "../../domain/entities/tournament.entity.js"
 import { computeRemainingMs } from "../../shared/tournament/tournament-timer.js"
+import type { StandingsService } from "../../application/services/standings.service.js"
 
 const resumeFinalizeTimers = new Map<string, NodeJS.Timeout>()
 const expiryTimers = new Map<string, NodeJS.Timeout>()
@@ -33,6 +35,8 @@ export class TournamentLiveController {
   constructor(
     private readonly tournamentLiveService: TournamentLiveService,
     private readonly liveStateNotifier: TournamentLiveStateNotifier,
+    private readonly standingsService: StandingsService,
+    private readonly standingsNotifier: TournamentStandingsNotifier,
   ) {}
 
   start = async (req: Request, res: Response) => {
@@ -93,6 +97,11 @@ export class TournamentLiveController {
       throw new BadRequestError("Tournament not found")
     }
 
+    if (tournament.status === "ENDED") {
+      clearTournamentExpiryTimer(tournamentId)
+      await this.broadcastContestEnded(tournament)
+    }
+
     const viewerRole = await this.tournamentLiveService.resolveViewerRole(tournament, auth.userId)
     const dto = toTournamentItemDto(tournament, viewerRole)
     if (viewerRole === "player") {
@@ -110,7 +119,7 @@ export class TournamentLiveController {
     clearTournamentExpiryTimer(tournamentId)
 
     const tournament = await this.tournamentLiveService.end(tournamentId, auth.userId)
-    this.liveStateNotifier.notify(toTournamentLiveStateDto(tournament))
+    await this.broadcastContestEnded(tournament)
 
     res.json(toTournamentItemDto(tournament, "host"))
   }
@@ -158,7 +167,7 @@ export class TournamentLiveController {
       return
     }
 
-    this.liveStateNotifier.notify(toTournamentLiveStateDto(tournament))
+    await this.broadcastContestEnded(tournament)
 
     if (tournament.status === "LIVE" && !tournament.pausedAt) {
       this.scheduleExpiry(tournament)
@@ -179,6 +188,14 @@ export class TournamentLiveController {
       if (finalized.status === "LIVE") {
         this.scheduleExpiry(finalized)
       }
+    }
+  }
+
+  private async broadcastContestEnded(tournament: TournamentWithHost) {
+    this.liveStateNotifier.notify(toTournamentLiveStateDto(tournament))
+    if (tournament.status === "ENDED") {
+      const standings = await this.standingsService.getStandings(tournament.id)
+      this.standingsNotifier.notify(standings)
     }
   }
 

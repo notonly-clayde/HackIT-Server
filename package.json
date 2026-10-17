@@ -13,7 +13,7 @@
     "db:studio": "node scripts/prisma-neon.mjs studio",
     "db:verify-admins": "node scripts/verify-neon-admin-emails.mjs",
     "db:seed": "tsx scripts/seed-catalog.ts",
-    "test": "tsx --test src/shared/judge/parse-test-value.test.ts prisma/catalog/catalog.test.ts src/infrastructure/judge/python-runtime.test.ts"
+    "test": "tsx --test src/shared/judge/parse-test-value.test.ts src/shared/tournament/tournament-elo.test.ts src/shared/tournament/all-players-finished.test.ts prisma/catalog/catalog.test.ts src/infrastructure/judge/python-runtime.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.0.0",

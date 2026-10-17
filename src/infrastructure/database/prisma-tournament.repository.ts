@@ -48,6 +48,8 @@ type TournamentRecord = {
   resumeAt?: Date | null
   pausedTotalMs: number
   endedAt: Date | null
+  endReason: "HOST" | "TIMER" | "ALL_PLAYERS_FINISHED" | null
+  playerStatsAppliedAt: Date | null
   createdAt: Date
   updatedAt: Date
   host: { displayName: string }
@@ -84,6 +86,8 @@ function toTournamentWithHost(record: TournamentRecord, includeHash = false): To
     resumeAt: record.resumeAt ?? null,
     pausedTotalMs: record.pausedTotalMs,
     endedAt: record.endedAt,
+    endReason: record.endReason,
+    playerStatsAppliedAt: record.playerStatsAppliedAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     hostDisplayName: record.host.displayName,
@@ -182,6 +186,10 @@ export class PrismaTournamentRepository implements ITournamentRepository {
           ...(data.resumeAt !== undefined ? { resumeAt: data.resumeAt } : {}),
           ...(data.pausedTotalMs !== undefined ? { pausedTotalMs: data.pausedTotalMs } : {}),
           ...(data.endedAt !== undefined ? { endedAt: data.endedAt } : {}),
+          ...(data.endReason !== undefined ? { endReason: data.endReason } : {}),
+          ...(data.playerStatsAppliedAt !== undefined
+            ? { playerStatsAppliedAt: data.playerStatsAppliedAt }
+            : {}),
         },
       })
     })

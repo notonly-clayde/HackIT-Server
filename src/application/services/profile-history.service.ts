@@ -2,15 +2,23 @@ import type { IMatchRepository } from "../../domain/repositories/match.repositor
 import type { ITournamentRepository } from "../../domain/repositories/tournament.repository.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
 import type {
+  HostedLobbyItemDto,
   ProfileHistoryItemDto,
   ProfileHistoryKind,
+  ProfileHistoryPrivateItemDto,
   ProfileHistoryTournamentItemDto,
   ProfileHistoryVersusItemDto,
 } from "../dto/user.dto.js"
-import type { TournamentItemDto } from "../dto/tournament.dto.js"
-import { toMatchHistoryItemDto } from "../mappers/versus.mapper.js"
+import { sortHostedLobbies } from "../utils/sort-hosted-lobbies.js"
+import {
+  profileMatchToHistoryRecord,
+  toMatchHistoryItemDto,
+  toPrivateHistoryItemDto,
+  toPrivateHostedRoomItemDto,
+} from "../mappers/versus.mapper.js"
 import { toTournamentItemDto } from "../mappers/tournament.mapper.js"
 import { ForbiddenError, NotFoundError } from "../../shared/errors/app-error.js"
+import type { ILobbyRepository } from "../../domain/repositories/lobby.repository.js"
 import type { StandingsService } from "./standings.service.js"
 
 const DEFAULT_HISTORY_LIMIT = 20
@@ -22,6 +30,7 @@ export class ProfileHistoryService {
     private readonly matchRepository: IMatchRepository,
     private readonly tournamentRepository: ITournamentRepository,
     private readonly standingsService: StandingsService,
+    private readonly lobbyRepository: ILobbyRepository,
   ) {}
 
   async listHistory(
@@ -39,12 +48,12 @@ export class ProfileHistoryService {
       ? Math.min(MAX_HISTORY_LIMIT, Math.max(1, Math.floor(rawLimit!)))
       : DEFAULT_HISTORY_LIMIT
 
-    const [versus, tournaments] = await Promise.all([
-      kind === "tournament" ? [] : this.listVersus(userId, limit),
+    const [oneVsOne, tournaments] = await Promise.all([
+      kind === "tournament" ? [] : this.listOneVsOneHistory(userId, limit),
       kind === "versus" ? [] : this.listTournaments(userId, limit, viewerId !== userId),
     ])
 
-    return [...versus, ...tournaments]
+    return [...oneVsOne, ...tournaments]
       .sort((a, b) => b.endedAt.localeCompare(a.endedAt))
       .slice(0, limit)
   }
@@ -53,7 +62,7 @@ export class ProfileHistoryService {
     userId: string,
     viewerId: string,
     rawLimit?: number,
-  ): Promise<TournamentItemDto[]> {
+  ): Promise<HostedLobbyItemDto[]> {
     if (userId !== viewerId) {
       throw new ForbiddenError("You can only view your own hosted tournaments")
     }
@@ -62,13 +71,41 @@ export class ProfileHistoryService {
       ? Math.min(MAX_HISTORY_LIMIT, Math.max(1, Math.floor(rawLimit!)))
       : DEFAULT_HISTORY_LIMIT
 
-    const tournaments = await this.tournamentRepository.findByHostId(userId)
-    return tournaments.slice(0, limit).map((tournament) => toTournamentItemDto(tournament, "host"))
+    const [tournaments, privateRooms] = await Promise.all([
+      this.tournamentRepository.findByHostId(userId),
+      this.matchRepository.findPrivateHostedByHostId(userId),
+    ])
+
+    const items: HostedLobbyItemDto[] = [
+      ...tournaments.map((tournament) => ({
+        lobbyKind: "tournament" as const,
+        ...toTournamentItemDto(tournament, "host"),
+      })),
+      ...privateRooms.map((room) => toPrivateHostedRoomItemDto(room)),
+    ]
+
+    return sortHostedLobbies(items).slice(0, limit)
   }
 
-  private async listVersus(userId: string, limit: number): Promise<ProfileHistoryVersusItemDto[]> {
-    const matches = await this.matchRepository.findRecentEndedByUserId(userId, limit)
-    return matches.map((match) => ({ kind: "versus", ...toMatchHistoryItemDto(match, userId) }))
+  private async listOneVsOneHistory(
+    userId: string,
+    limit: number,
+  ): Promise<Array<ProfileHistoryVersusItemDto | ProfileHistoryPrivateItemDto>> {
+    const matches = await this.matchRepository.findRecentProfileMatchesByUserId(userId, limit)
+    const items: Array<ProfileHistoryVersusItemDto | ProfileHistoryPrivateItemDto> = []
+    for (const match of matches) {
+      if (match.status === "ABORTED" && match.kind === "PRIVATE") {
+        items.push(toPrivateHistoryItemDto(match))
+        continue
+      }
+      if (match.status !== "ENDED") {
+        continue
+      }
+      const record = profileMatchToHistoryRecord(match)
+      if (!record) continue
+      items.push({ kind: "versus", ...toMatchHistoryItemDto(record, userId) })
+    }
+    return items
   }
 
   // Ranks are recomputed from submissions per tournament; persist end-of-contest snapshots if this gets slow.
@@ -88,7 +125,8 @@ export class ProfileHistoryService {
         const standings = await this.standingsService.getRankedStandings(tournament.id)
         const entry = standings.find((row) => row.userId === userId)
         if (!entry) return null
-        return {
+        const participation = await this.lobbyRepository.findPlayer(tournament.id, userId)
+        const item: ProfileHistoryTournamentItemDto = {
           kind: "tournament",
           tournamentId: tournament.id,
           name: tournament.name,
@@ -99,6 +137,16 @@ export class ProfileHistoryService {
           solved: entry.solved,
           score: entry.score,
         }
+        if (
+          participation?.eloBefore != null &&
+          participation.eloAfter != null &&
+          !entry.disqualified
+        ) {
+          item.eloBefore = participation.eloBefore
+          item.eloAfter = participation.eloAfter
+          item.eloDelta = participation.eloAfter - participation.eloBefore
+        }
+        return item
       }),
     )
 

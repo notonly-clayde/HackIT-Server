@@ -6,6 +6,9 @@ export type StandingsEntryDto = {
   penalty: number
   score: number
   disqualified: boolean
+  eloBefore?: number
+  eloAfter?: number
+  eloDelta?: number
 }
 
 export type TournamentStandingsDto = {

@@ -2,7 +2,7 @@ import type { ILobbyRepository } from "../../domain/repositories/lobby.repositor
 import type { ITournamentProblemRepository } from "../../domain/repositories/tournament-problem.repository.js"
 import type { ITournamentRepository } from "../../domain/repositories/tournament.repository.js"
 import type { IUserRepository } from "../../domain/repositories/user.repository.js"
-import type { TournamentWithHost } from "../../domain/entities/tournament.entity.js"
+import type { TournamentEndReason, TournamentWithHost } from "../../domain/entities/tournament.entity.js"
 import {
   ACTIVITY_ACTIONS,
   ACTIVITY_TARGET_TYPES,
@@ -16,6 +16,8 @@ import { computeRemainingMs } from "../../shared/tournament/tournament-timer.js"
 import { isUserEmailVerified } from "../../shared/auth/email-verified.js"
 import type { ActivityLogService } from "./activity-log.service.js"
 import type { StandingsService } from "./standings.service.js"
+import type { TournamentPlayerStatsService } from "./tournament-player-stats.service.js"
+import { allEligiblePlayersAcceptedScore } from "../../shared/tournament/all-players-finished.js"
 
 export const RESUME_COUNTDOWN_MS = 5000
 
@@ -31,12 +33,18 @@ export class TournamentLiveService {
     private readonly userRepository: IUserRepository,
     private readonly activityLogService: ActivityLogService,
     private readonly standingsService: StandingsService,
+    private readonly tournamentPlayerStatsService: TournamentPlayerStatsService,
   ) {}
 
   async getTournamentMaybeFinalized(tournamentId: string): Promise<TournamentWithHost | null> {
     const tournament = await this.tournamentRepository.findByIdWithHost(tournamentId)
     if (!tournament) return null
-    return this.finalizeLiveState(tournament)
+    const finalized = await this.finalizeLiveState(tournament)
+    if (finalized.status === "ENDED") {
+      await this.tournamentPlayerStatsService.applyIfNeeded(finalized.id)
+      return (await this.tournamentRepository.findByIdWithHost(finalized.id)) ?? finalized
+    }
+    return finalized
   }
 
   async listLiveTournaments(): Promise<TournamentWithHost[]> {
@@ -91,10 +99,13 @@ export class TournamentLiveService {
       return tournament
     }
 
-    return this.endLive(tournament)
+    return this.endLive(tournament, "TIMER")
   }
 
-  async endLive(tournament: TournamentWithHost): Promise<TournamentWithHost> {
+  async endLive(
+    tournament: TournamentWithHost,
+    endReason: TournamentEndReason = "TIMER",
+  ): Promise<TournamentWithHost> {
     const current = await this.tournamentRepository.findByIdWithHost(tournament.id)
     if (!current) {
       return tournament
@@ -116,13 +127,22 @@ export class TournamentLiveService {
       pausedTotalMs += pauseEnd.getTime() - current.pausedAt.getTime()
     }
 
-    return this.tournamentRepository.update(current.id, {
+    const wasLive = current.status === "LIVE"
+    const ended = await this.tournamentRepository.update(current.id, {
       status: "ENDED",
       endedAt: now,
+      endReason,
       pausedAt: null,
       resumeAt: null,
       pausedTotalMs,
     })
+
+    if (wasLive) {
+      await this.tournamentPlayerStatsService.applyIfNeeded(ended.id)
+      return (await this.tournamentRepository.findByIdWithHost(ended.id)) ?? ended
+    }
+
+    return ended
   }
 
   async start(tournamentId: string, hostId: string) {
@@ -149,6 +169,7 @@ export class TournamentLiveService {
       resumeAt: null,
       pausedTotalMs: 0,
       endedAt: null,
+      endReason: null,
     })
 
     void this.activityLogService.record({
@@ -257,7 +278,7 @@ export class TournamentLiveService {
       throw new BadRequestError("Tournament must be Live to end")
     }
 
-    const result = await this.endLive(tournament)
+    const result = await this.endLive(tournament, "HOST")
 
     if (result.status === "ENDED") {
       void this.activityLogService.record({
@@ -331,6 +352,25 @@ export class TournamentLiveService {
     }
 
     await this.lobbyRepository.markScoreAccepted(tournamentId, userId)
+
+    const lobby = await this.lobbyRepository.findLobbyState(tournamentId)
+    if (
+      lobby &&
+      allEligiblePlayersAcceptedScore(lobby.players) &&
+      tournament.status === "LIVE"
+    ) {
+      const ended = await this.endLive(tournament, "ALL_PLAYERS_FINISHED")
+      void this.activityLogService.record({
+        action: ACTIVITY_ACTIONS.TOURNAMENT_ENDED,
+        actorType: "SYSTEM",
+        actorId: null,
+        targetType: ACTIVITY_TARGET_TYPES.TOURNAMENT,
+        targetId: ended.id,
+        tournamentId: ended.id,
+        summary: `Tournament ended — all players finished: ${ended.name}`,
+      })
+      return (await this.tournamentRepository.findByIdWithHost(tournamentId)) ?? ended
+    }
 
     return tournament
   }

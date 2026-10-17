@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { TournamentItemDto } from "./tournament.dto.js"
 import type { VersusDifficultyDto, VersusEndedReason } from "./versus.dto.js"
 
 export const updateUserSchema = z
@@ -75,6 +76,7 @@ export type MatchHistoryOpponentDto = {
 
 export type MatchHistoryItemDto = {
   matchId: string
+  matchKind: "ranked" | "private"
   endedAt: string
   difficulty: VersusDifficultyDto
   endedReason: VersusEndedReason | null
@@ -99,6 +101,38 @@ export type ProfileHistoryTournamentItemDto = {
   rankTotal: number
   solved: number
   score: number
+  eloBefore?: number
+  eloAfter?: number
+  eloDelta?: number
 }
 
-export type ProfileHistoryItemDto = ProfileHistoryVersusItemDto | ProfileHistoryTournamentItemDto
+export type ProfileHistoryPrivateItemDto = {
+  kind: "private"
+  matchId: string
+  name: string
+  endedAt: string
+  difficulty: VersusDifficultyDto
+  passwordProtected: boolean
+  outcome: "aborted"
+}
+
+export type ProfileHistoryItemDto =
+  | ProfileHistoryVersusItemDto
+  | ProfileHistoryTournamentItemDto
+  | ProfileHistoryPrivateItemDto
+
+export type HostedPrivateRoomItemDto = {
+  lobbyKind: "privateRoom"
+  id: string
+  name: string
+  type: "1v1 Match"
+  status: "Open" | "Live" | "Ended"
+  players: number
+  maxPlayers: 2
+  passwordProtected: boolean
+  createdAt: string
+}
+
+export type HostedTournamentLobbyItemDto = TournamentItemDto & { lobbyKind: "tournament" }
+
+export type HostedLobbyItemDto = HostedTournamentLobbyItemDto | HostedPrivateRoomItemDto

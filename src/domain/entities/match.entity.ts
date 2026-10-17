@@ -65,6 +65,7 @@ export type MatchHistoryOpponent = {
 
 export type MatchHistoryRecord = {
   id: string
+  kind: MatchKind
   difficulty: ProblemDifficulty
   endedAt: Date | null
   winnerId: string | null
@@ -77,6 +78,39 @@ export type MatchHistoryRecord = {
   endedReason: string | null
   playerA: MatchHistoryOpponent
   playerB: MatchHistoryOpponent
+}
+
+/** Profile history source row — includes aborted private rooms without a guest. */
+export type ProfileMatchHistoryRecord = {
+  id: string
+  kind: MatchKind
+  status: MatchStatus
+  lobbyName: string | null
+  passwordHash: string | null
+  difficulty: ProblemDifficulty
+  endedAt: Date | null
+  winnerId: string | null
+  playerAId: string
+  playerBId: string | null
+  playerAEloBefore: number
+  playerBEloBefore: number | null
+  playerAEloAfter: number | null
+  playerBEloAfter: number | null
+  endedReason: string | null
+  playerA: MatchHistoryOpponent
+  playerB: MatchHistoryOpponent | null
+}
+
+export type HostedPrivateMatchRecord = {
+  id: string
+  lobbyName: string | null
+  passwordHash: string | null
+  status: MatchStatus
+  playerBId: string | null
+  durationMinutes: number
+  createdAt: Date
+  endedAt: Date | null
+  startedAt: Date | null
 }
 
 export type CreateMatchData = {
